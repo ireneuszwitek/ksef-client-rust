@@ -1,0 +1,38 @@
+[package]
+name = "ksef-client"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ireneusz Witek"]
+license = "MIT OR Apache-2.0"
+description = "Client API KSeF 2.0"
+readme = "README.md"
+keywords = ["ksef", "client"]
+categories = ["api-bindings","web-programming::http-client","web-programming","network-programming"]
+
+exclude = ["target/", ".gitignore"]
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.37", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"]} 
+base64 = "0.21"
+rsa = "0.9"
+sha2 = "0.10"
+rand = "0.8"
+pem-rfc7468 = "1.0"
+x509-parser = "0.18"
+urlencoding = "2.1"
+url = "2"
+aes = "0.7"
+block-modes = "0.8"
+block-padding = "0.2"
+zip = "8.1"
