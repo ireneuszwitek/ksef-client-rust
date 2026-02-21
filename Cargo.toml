@@ -8,6 +8,7 @@ description = "Client API KSeF 2.0"
 readme = "README.md"
 keywords = ["ksef", "client"]
 categories = ["api-bindings","web-programming::http-client","web-programming","network-programming"]
+repository = "https://github.com/ireneuszwitek/ksef-client-rust"
 
 exclude = ["target/", ".gitignore"]
 
