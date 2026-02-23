@@ -1,6 +1,6 @@
 [package]
 name = "ksef-client"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["Ireneusz Witek"]
 license = "MIT OR Apache-2.0"
@@ -37,3 +37,5 @@ aes = "0.7"
 block-modes = "0.8"
 block-padding = "0.2"
 zip = "8.1"
+qrcodegen = "1.8.0"
+skia-safe = { version = "0.93", features = ["textlayout", "embed-icudtl"] }

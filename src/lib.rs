@@ -11,6 +11,8 @@ use tokio;
 use tokio::time::sleep;
 use urlencoding::encode;
 
+use chrono::{DateTime, Utc};
+
 const METADATA_ENTRY_NAME: &str = "_metadata.json";
 const XML_FILE_EXTENSION: &str = ".xml";
 
@@ -18,6 +20,7 @@ mod certificates;
 mod cryptography;
 pub mod invoice;
 mod models;
+mod qrcode;
 mod utils;
 
 pub struct KsefClient {
@@ -187,7 +190,6 @@ impl KsefClient {
         if page_size > 0 {
             url = format!("{}&pageSize={}", url, page_size);
         }
-
 
         let reqwest_client = reqwest::Client::new();
         let resp = reqwest_client
@@ -365,17 +367,19 @@ impl KsefClient {
         Err("export_error")
     }
 
-    pub async fn get_invoice_export(
+    pub async fn invoice_export(
         &self,
         filters: &invoice::InvoiceQueryFilters,
         access_token: &String,
     ) -> Result<invoice::InvoiceExportResult, models::ErrorResponse> {
         let encryption = match cryptography::get_encryption_data(&self).await {
             Ok(encryption) => encryption,
-            Err(e) => return Err(models::ErrorResponse {
-                code: "encryption_error".into(),
-                message: e.into(),
-            }),
+            Err(e) => {
+                return Err(models::ErrorResponse {
+                    code: "encryption_error".into(),
+                    message: e.into(),
+                });
+            }
         };
 
         let invoice_export_request = invoice::InvoiceExportRequest {
@@ -388,10 +392,12 @@ impl KsefClient {
             .await
         {
             Ok(start_invoices_export) => start_invoices_export,
-            Err(e) => return Err(models::ErrorResponse {
-                code: "start_invoices_export_error".into(),
-                message: format!("Status: {}", e),
-            }),
+            Err(e) => {
+                return Err(models::ErrorResponse {
+                    code: "start_invoices_export_error".into(),
+                    message: format!("Status: {}", e),
+                });
+            }
         };
 
         let invoice_export_status = match self
@@ -399,15 +405,16 @@ impl KsefClient {
             .await
         {
             Ok(export_status) => export_status,
-            Err(e) => return Err(models::ErrorResponse {
-                code: "invoice_export_status_error".into(),
-                message: e.into(),
-            }),
+            Err(e) => {
+                return Err(models::ErrorResponse {
+                    code: "invoice_export_status_error".into(),
+                    message: e.into(),
+                });
+            }
         };
 
         let mut metadata_summaries: Vec<invoice::InvoiceSummary> = Vec::new();
         let mut xml_files: HashMap<String, String> = HashMap::new();
-
 
         if !invoice_export_status.package.parts.is_empty() {
             let decrypted_archive_stream = match self
@@ -415,10 +422,12 @@ impl KsefClient {
                 .await
             {
                 Ok(decrypted_archive_stream) => decrypted_archive_stream,
-                Err(e) => return Err(models::ErrorResponse {
-                    code: "download_package_parts_error".into(),
-                    message: e.into(),
-                }),
+                Err(e) => {
+                    return Err(models::ErrorResponse {
+                        code: "download_package_parts_error".into(),
+                        message: e.into(),
+                    });
+                }
             };
 
             let unzipped_files = utils::unzip(decrypted_archive_stream);
@@ -436,17 +445,16 @@ impl KsefClient {
                     xml_files.insert(file_name.to_lowercase(), content);
                 }
             }
-
         }
 
-        let result = invoice::InvoiceExportResult{
+        let result = invoice::InvoiceExportResult {
             metadata_summaries: metadata_summaries,
             xml_files: xml_files,
             is_truncated: invoice_export_status.package.is_truncated,
             last_permanent_storage_date: invoice_export_status.package.last_permanent_storage_date,
             permanent_storage_hwm_date: invoice_export_status.package.permanent_storage_hwm_date,
         };
-        
+
         Ok(result)
     }
 
@@ -516,5 +524,29 @@ impl KsefClient {
             .map_err(|e| format!("Get bytes error: {}", e))
             .unwrap();
         Ok(bytes.to_vec())
+    }
+
+    pub async fn get_qrcode(
+        &self,
+        base_url: &String,
+        nip: &String,
+        issue_date: &DateTime<Utc>,
+        invoice_hash: &String,
+        resolution_px: Option<i32>,
+    ) -> Result<Vec<u8>, models::ErrorResponse> {
+
+        let invoice_for_online_url =
+            qrcode::build_invoice_verification_url(&base_url, nip, &issue_date, &invoice_hash)
+                .map_err(|_| models::ErrorResponse {
+                    code: "build_url_error".into(),
+                    message: "Building invoice URL failed".into(),
+                })?;
+
+        let png_bytes = qrcode::generate(&invoice_for_online_url, resolution_px).map_err(|_| models::ErrorResponse {
+                    code: "qr_generate_error".into(),
+                    message: "QR generation failed".into(),
+                })?;
+
+        Ok(png_bytes)
     }
 }

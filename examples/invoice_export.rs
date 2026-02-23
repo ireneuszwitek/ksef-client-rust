@@ -16,13 +16,13 @@ async fn main() {
         },
     };
 
-    let get_invoice_export_result = match client.get_invoice_export(&invoice_query_filters, &access_token).await {
-        Ok(get_invoice_export_result) => get_invoice_export_result,
+    let invoice_export = match client.invoice_export(&invoice_query_filters, &access_token).await {
+        Ok(invoice_export) => invoice_export,
         Err(e) => {
             eprintln!("Error: {}; {}", e.code, e.message);
             return;
         }
     };
 
-    println!("{:#?}", get_invoice_export_result);
+    println!("{:#?}", invoice_export);
 }
