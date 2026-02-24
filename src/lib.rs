@@ -2,13 +2,11 @@ use base64;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 
-use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Cursor, Write};
+use std::time::Duration;
 
-use tokio;
-use tokio::time::sleep;
 use urlencoding::encode;
 
 use chrono::{DateTime, Utc};
@@ -24,7 +22,6 @@ mod qrcode;
 mod utils;
 
 pub struct KsefClient {
-    base_url_parsed: url::Url,
     base_url: String,
     sleep_time: u64,
     public_certificates: RefCell<Option<Vec<models::PemCertificateInfo>>>,
@@ -43,15 +40,14 @@ impl KsefClient {
             .trim_end_matches('/')
             .to_string();
         Ok(Self {
-            base_url_parsed,
             base_url,
             sleep_time,
             public_certificates: RefCell::new(None),
         })
     }
 
-    fn join_url(&self, path: &str) -> url::Url {
-        self.base_url_parsed.join(path).unwrap()
+    fn join_url(&self, url: &str) -> String {
+        format!("{}{}", self.base_url, url)
     }
 
     pub async fn get_access_tokens(
@@ -106,34 +102,20 @@ impl KsefClient {
         };
 
         let poll_timeout = Duration::from_secs(2 * 60); // 2 minuty
-
         let total_millis = poll_timeout.as_millis();
+        let max_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
 
-        let status_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
-
-        for attempt in 1..=status_attempts {
-            match self
-                .get_auth_status(
+        let _ = utils::pool(
+            || {
+                self.get_auth_status(
                     &signature.reference_number,
                     &signature.authentication_token.token,
                 )
-                .await
-            {
-                Ok(auth_status) => {
-                    if auth_status.status.code == 200 {
-                        break;
-                    }
-                }
-                Err(_) => {
-                    return Err("auth_status_error");
-                }
-            }
-            if attempt == status_attempts {
-                return Err("Maximum number of attempts exceeded");
-            }
-
-            sleep(Duration::from_millis(self.sleep_time)).await;
-        }
+            },
+            max_attempts,
+            self.sleep_time,
+        )
+        .await;
 
         let tokens = match self
             .get_access_token_by_authentication_token(&signature.authentication_token.token)
@@ -315,7 +297,7 @@ impl KsefClient {
         Ok(result)
     }
 
-    async fn get_invoice_export_status_try(
+    async fn get_invoice_export_status(
         &self,
         reference_number: &String,
         access_token: &String,
@@ -331,40 +313,6 @@ impl KsefClient {
             .json::<invoice::InvoiceExportStatusResponse>()
             .await?;
         Ok(result)
-    }
-
-    async fn get_invoice_export_status(
-        &self,
-        reference_number: &String,
-        access_token: &String,
-    ) -> Result<invoice::InvoiceExportStatusResponse, &'static str> {
-        let poll_timeout = Duration::from_secs(2 * 60);
-
-        let total_millis = poll_timeout.as_millis();
-        let status_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
-
-        for attempt in 1..=status_attempts {
-            match self
-                .get_invoice_export_status_try(&reference_number, &access_token)
-                .await
-            {
-                Ok(try_status) => {
-                    if try_status.status.code == 200 {
-                        return Ok(try_status);
-                    }
-                }
-                Err(_) => {
-                    return Err("try_status_error");
-                }
-            }
-            if attempt == status_attempts {
-                return Err("Maximum number of attempts exceeded");
-            }
-
-            sleep(Duration::from_millis(self.sleep_time)).await;
-        }
-
-        Err("export_error")
     }
 
     pub async fn invoice_export(
@@ -400,9 +348,21 @@ impl KsefClient {
             }
         };
 
-        let invoice_export_status = match self
-            .get_invoice_export_status(&start_invoices_export.reference_number, &access_token)
-            .await
+        let poll_timeout = Duration::from_secs(2 * 60); // 2 minuty
+        let total_millis = poll_timeout.as_millis();
+        let max_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
+
+        let invoice_export_status = match utils::pool(
+            || {
+                self.get_invoice_export_status(
+                    &start_invoices_export.reference_number,
+                    &access_token,
+                )
+            },
+            max_attempts,
+            self.sleep_time,
+        )
+        .await
         {
             Ok(export_status) => export_status,
             Err(e) => {
@@ -534,7 +494,6 @@ impl KsefClient {
         invoice_hash: &String,
         resolution_px: Option<i32>,
     ) -> Result<Vec<u8>, models::ErrorResponse> {
-
         let invoice_for_online_url =
             qrcode::build_invoice_verification_url(&base_url, nip, &issue_date, &invoice_hash)
                 .map_err(|_| models::ErrorResponse {
@@ -542,10 +501,12 @@ impl KsefClient {
                     message: "Building invoice URL failed".into(),
                 })?;
 
-        let png_bytes = qrcode::generate(&invoice_for_online_url, resolution_px).map_err(|_| models::ErrorResponse {
-                    code: "qr_generate_error".into(),
-                    message: "QR generation failed".into(),
-                })?;
+        let png_bytes = qrcode::generate(&invoice_for_online_url, resolution_px).map_err(|_| {
+            models::ErrorResponse {
+                code: "qr_generate_error".into(),
+                message: "QR generation failed".into(),
+            }
+        })?;
 
         Ok(png_bytes)
     }

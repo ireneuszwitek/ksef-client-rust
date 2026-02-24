@@ -123,6 +123,11 @@ pub(crate) struct OperationStatusInfo {
     pub(crate) description: String,
 }
 
+pub(crate) trait HasOperationStatusInfo { 
+    fn status(&self) -> &OperationStatusInfo; 
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AuthStatus {
     #[serde(rename = "startDate")]
@@ -143,6 +148,14 @@ pub(crate) struct AuthStatus {
     #[serde(rename = "refreshTokenValidUntil")]
     pub(crate) refresh_token_valid_until: Option<DateTime<Utc>>,
 }
+
+impl HasOperationStatusInfo for AuthStatus { 
+    fn status(&self) -> &OperationStatusInfo { 
+        &self.status 
+    } 
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) enum AuthenticationMethodEnum {
