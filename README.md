@@ -1,4 +1,4 @@
-# ksef-client-rust
+# KSeF Client Rust
 
 [PL] komunikacja z API Krajowego Systemu e-Faktur (KSeF 2.0)
 
@@ -6,14 +6,9 @@
 
 Biblioteka jest napisana w języku Rust; jest gotowa do integracji z istniejącymi projektami.
 
-## 🌟 Funkcje
-
-- Obsługa błędów zgodna z idiomami Rust
-- Integracja z `async`/`await`
-
 ## 📜 Przykłady
 
-Przykłady użycia biblioteki znajdują się w katalogu `examples/`.
+Przykłady użycia biblioteki znajdują się w katalogu `examples`
 
 - `get_access_token.rs` - autentykacja i pobranie access_token
 - `refresh_token.rs` - odświeżenie wygasłego access_token

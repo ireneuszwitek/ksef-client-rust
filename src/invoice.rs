@@ -325,13 +325,6 @@ pub(crate) struct InvoiceExportStatusResponse {
     pub(crate) package: InvoiceExportPackage,
 }
 
-impl models::HasOperationStatusInfo for InvoiceExportStatusResponse { 
-    fn status(&self) -> &models::OperationStatusInfo { 
-        &self.status 
-    } 
-}
-
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InvoiceExportPackage {
     #[serde(rename = "invoiceCount")]

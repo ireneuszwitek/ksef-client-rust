@@ -3,8 +3,6 @@ use std::io::{Read, Seek};
 use tokio::time::{Duration, sleep};
 use zip::ZipArchive;
 
-use crate::models;
-
 pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
     let mut archive = ZipArchive::new(zip_stream).unwrap();
     let mut files = HashMap::new();
@@ -25,16 +23,16 @@ pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
     files
 }
 
-pub(crate) async fn pool<F, Fut, R>(f: F, max_attempts: i32, delay_ms: u64) -> Result<R, &'static str>
+pub(crate) async fn pool<T, FAction, FutA, FCond>(action: FAction, condition: FCond, max_attempts: i32, delay_ms: u64) -> Result<T, &'static str>
 where
-    F: Fn() -> Fut,
-    Fut: Future<Output = Result<R, reqwest::Error>>,
-    R: models::HasOperationStatusInfo,
+    FAction: Fn() -> FutA,
+    FutA: Future<Output = Result<T, reqwest::Error>>,
+    FCond: Fn(&T) -> bool,
 {
     for _ in 1..=max_attempts {
-        match f().await {
+        match action().await {
             Ok(result) => {
-                if result.status().code == 200 {
+                if condition(&result) {
                     return Ok(result);
                 }
             }
@@ -46,5 +44,5 @@ where
         sleep(Duration::from_millis(delay_ms)).await;
     }
 
-    Err("Maximum number of attempts exceeded")
+    Err("Maximum number of attempts exceeded")    
 }

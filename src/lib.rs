@@ -112,6 +112,7 @@ impl KsefClient {
                     &signature.authentication_token.token,
                 )
             },
+            |result| result.status.code == 200,
             max_attempts,
             self.sleep_time,
         )
@@ -359,6 +360,7 @@ impl KsefClient {
                     &access_token,
                 )
             },
+            |result| result.status.code == 200,
             max_attempts,
             self.sleep_time,
         )
