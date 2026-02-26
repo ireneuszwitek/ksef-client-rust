@@ -1,9 +1,8 @@
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
-use qrcodegen::{QrCode, QrCodeEcc};
-use skia_safe::{surfaces, Color, Paint, Rect, Image, EncodedImageFormat};
-
-
+use qrcode::QrCode;
+use image::{ImageBuffer, Luma};
+use std::io::Cursor;
 
 pub(crate) fn decode_base64_or_base64url(input: &str) -> Result<Vec<u8>, &'static str> {
     if input.trim().is_empty() {
@@ -50,8 +49,8 @@ pub(crate) fn build_invoice_verification_url(
 }
 
 pub(crate) fn generate(
-    payload_url: &String,
-    qr_resolution_px: Option<i32>,
+    data: &String,
+    qr_resolution_px: Option<u32>,
 ) -> Result<Vec<u8>, &'static str> {
 
     let qr_resolution_px = match qr_resolution_px {
@@ -59,46 +58,48 @@ pub(crate) fn generate(
         None => 200,
     };
 
-    // QR generation
-    let qr = QrCode::encode_text(payload_url, QrCodeEcc::Medium)
-        .map_err(|_| "Failed to generate QR")?;
+    let qr = QrCode::new(data).map_err(|_| "Failed to generate QR")?;
+    let modules = qr.width() as u32;
 
-    let modules = qr.size();
-    if modules <= 0 {
+    if modules == 0 {
         return Err("Invalid QR size");
     }
 
-    // Cell size calculation
     let cell_size = qr_resolution_px as f32 / modules as f32;
 
-    // Creating a Skia Surface
-    let mut surface = surfaces::raster_n32_premul((qr_resolution_px, qr_resolution_px))
-        .ok_or("Failed to create surface")?;
-    let canvas = surface.canvas();
+    let mut img = ImageBuffer::<Luma<u8>, Vec<u8>>::new(qr_resolution_px, qr_resolution_px);
 
-    // White background
-    let mut paint = Paint::default();
-    paint.set_color(Color::WHITE);
-    canvas.draw_rect(Rect::from_xywh(0.0, 0.0, qr_resolution_px as f32, qr_resolution_px as f32), &paint);
-
-    // Drawing QR modules
-    paint.set_color(Color::BLACK);
+    for pixel in img.pixels_mut() {
+        *pixel = Luma([255u8]);
+    }
 
     for y in 0..modules {
         for x in 0..modules {
-            if qr.get_module(x, y) {
-                let px = x as f32 * cell_size;
-                let py = y as f32 * cell_size;
-                canvas.draw_rect(Rect::from_xywh(px, py, cell_size, cell_size), &paint);
+            if qr[(x as usize, y as usize)] == qrcode::Color::Dark {
+                let px = (x as f32 * cell_size).floor() as u32;
+                let py = (y as f32 * cell_size).floor() as u32;
+
+                let w = cell_size.ceil() as u32;
+                let h = cell_size.ceil() as u32;
+
+                for dy in 0..h {
+                    for dx in 0..w {
+                        let xx = px + dx;
+                        let yy = py + dy;
+
+                        if xx < qr_resolution_px && yy < qr_resolution_px {
+                            img.put_pixel(xx, yy, Luma([0u8]));
+                        }
+                    }
+                }
             }
         }
     }
 
-    // PNG export
-    let image: Image = surface.image_snapshot();
-    #[allow(deprecated)]
-    let data = image.encode_to_data(EncodedImageFormat::PNG)
-        .ok_or("Failed to encode PNG")?;
+    // Save to PNG
+    let mut buf = Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageOutputFormat::Png)
+        .map_err(|_| "Failed to encode PNG")?;
 
-    Ok(data.as_bytes().to_vec())
+    Ok(buf.into_inner())
 }

@@ -18,7 +18,7 @@ mod certificates;
 mod cryptography;
 pub mod invoice;
 mod models;
-mod qrcode;
+mod qr;
 mod utils;
 
 pub struct KsefClient {
@@ -543,19 +543,19 @@ impl KsefClient {
         nip: &String,
         issue_date: &DateTime<Utc>,
         invoice_hash: &String,
-        resolution_px: Option<i32>,
+        resolution_px: Option<u32>,
     ) -> Result<Vec<u8>, models::ErrorResponse> {
         let invoice_for_online_url =
-            qrcode::build_invoice_verification_url(&base_url, nip, &issue_date, &invoice_hash)
+            qr::build_invoice_verification_url(&base_url, nip, &issue_date, &invoice_hash)
                 .map_err(|_| models::ErrorResponse {
                     code: "build_url_error".into(),
                     message: "Building invoice URL failed".into(),
                 })?;
 
-        let png_bytes = qrcode::generate(&invoice_for_online_url, resolution_px).map_err(|_| {
+        let png_bytes = qr::generate(&invoice_for_online_url, resolution_px).map_err(|_| {
             models::ErrorResponse {
                 code: "qr_generate_error".into(),
-                message: "QR generation failed".into(),
+                message: "Failed to generate QR".into(),
             }
         })?;
 
