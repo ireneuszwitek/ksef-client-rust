@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 #[tokio::main]
 async fn main() {
 
-    let client = ksef_client::KsefClient::new("https://api.ksef.mf.gov.pl".to_string(), 2000).unwrap();
+    let client = ksef::KsefClient::new("https://api.ksef.mf.gov.pl".to_string(), 2000).unwrap();
     
     let qrcode_base_url = "https://qr.ksef.mf.gov.pl".to_string();
     let nip = "<nip>".to_string();

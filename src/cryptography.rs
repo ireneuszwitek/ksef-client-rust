@@ -1,27 +1,19 @@
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
+use aes::Aes256;
 use base64;
-use rand::RngCore;
-use rand::rngs::OsRng;
-use rsa::oaep::Oaep;
+use base64::{Engine, engine::general_purpose::STANDARD};
+use cbc::{Decryptor, Encryptor};
+use cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
+use pem_rfc7468::LineEnding;
+use rand::{RngCore, rngs::OsRng};
 use rsa::{
     RsaPublicKey,
     pkcs8::{DecodePublicKey, EncodePublicKey},
+    oaep::Oaep
 };
-use sha2::Sha256;
+use sha2::{Sha256, Digest};
+use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
 
-use pem_rfc7468::LineEnding;
-use x509_parser::parse_x509_certificate;
-use x509_parser::pem::parse_x509_pem;
-
-
-use aes::Aes256;
-use block_modes::block_padding::Pkcs7;
-use block_modes::{BlockMode, Cbc};
-
-type Aes256Cbc = Cbc<Aes256, Pkcs7>;
-
-use crate::{KsefClient, models, certificates};
+use crate::{KsefClient, certificates, models};
 
 pub(crate) fn export_public_key_to_pem(
     rsa: &RsaPublicKey,
@@ -66,52 +58,65 @@ pub(crate) fn generate_random_16_bytes_iv() -> Vec<u8> {
     iv
 }
 
-pub(crate) fn decrypt_bytes_with_aes256(
-    content: &[u8],
-    key: &[u8],
-    iv: &[u8],
-) -> Result<Vec<u8>, String> {
-    if key.len() != 32 {
-        return Err("AES-256 key must be 32 bytes".into());
-    }
-    if iv.len() != 16 {
-        return Err("AES-CBC IV must be 16 bytes".into());
-    }
+pub fn encrypt_bytes_with_aes256(content: &[u8], key: &[u8], iv: &[u8]) -> Vec<u8> {
+    let buf = content.to_vec();
 
-    let cipher =
-        Aes256Cbc::new_from_slices(key, iv).map_err(|e| format!("Cipher init error: {e}"))?;
-
-    cipher
-        .decrypt_vec(content)
-        .map_err(|e| format!("Decrypt error: {e}"))
+    Encryptor::<Aes256>::new_from_slices(key, iv)
+        .unwrap()
+        .encrypt_padded_vec_mut::<Pkcs7>(&buf)
 }
 
-    pub(crate) async fn get_encryption_data(client: &KsefClient) -> Result<models::EncryptionData, &str> {
-        let key = generate_random_256_bits_key();
-        let iv = generate_random_16_bytes_iv();
+pub fn decrypt_bytes_with_aes256(content: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, String> {
+    let decryptor = Decryptor::<Aes256>::new_from_slices(key, iv)
+        .map_err(|e| format!("Invalid key/iv: {e}"))?;
 
-        let symetric_cert = match certificates::
-            public_certificate(&client, &models::PublicKeyCertificateUsage::SymmetricKeyEncryption)
-            .await
-        {
-            Ok(symetric_cert) => symetric_cert,
-            Err(_) => {
-                return Err("get symetric_cert error");
-            }
-        };
+    decryptor
+        .decrypt_padded_vec_mut::<Pkcs7>(content)
+        .map_err(|e| format!("Decryption failed: {e}"))
+}
 
-        let encrypted_key: Vec<u8> = encrypt_ksef_token_with_rsa_using_public_key(&symetric_cert, &key).unwrap();
+pub(crate) async fn get_encryption_data(
+    client: &KsefClient,
+) -> Result<models::EncryptionData, &str> {
+    let key = generate_random_256_bits_key();
+    let iv = generate_random_16_bytes_iv();
 
-        let encryption_info = models::EncryptionInfo {
-            encrypted_symmetric_key: STANDARD.encode(&encrypted_key),
-            initialization_vector: STANDARD.encode(&iv),
-        };
+    let symetric_cert = match certificates::public_certificate(
+        &client,
+        &models::PublicKeyCertificateUsage::SymmetricKeyEncryption,
+    )
+    .await
+    {
+        Ok(symetric_cert) => symetric_cert,
+        Err(_) => {
+            return Err("get symetric_cert error");
+        }
+    };
 
-        let encrypted_data = models::EncryptionData {
-            cipher_key: key,
-            cipher_iv: iv,
-            encryption_info,
-        };
+    let encrypted_key: Vec<u8> =
+        encrypt_ksef_token_with_rsa_using_public_key(&symetric_cert, &key).unwrap();
 
-        Ok(encrypted_data)
+    let encryption_info = models::EncryptionInfo {
+        encrypted_symmetric_key: STANDARD.encode(&encrypted_key),
+        initialization_vector: STANDARD.encode(&iv),
+    };
+
+    let encrypted_data = models::EncryptionData {
+        cipher_key: key,
+        cipher_iv: iv,
+        encryption_info,
+    };
+
+    Ok(encrypted_data)
+}
+
+pub(crate) fn get_metadata(file: &[u8]) -> models::FileMetadata {
+    let mut hasher = Sha256::new();
+    hasher.update(file);
+    let hash = hasher.finalize();
+
+    models::FileMetadata {
+        file_size: file.len(),
+        hash_sha: STANDARD.encode(hash),
     }
+}

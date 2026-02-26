@@ -1,9 +1,9 @@
 #[tokio::main]
 async fn main() {
     
-    let client = ksef_client::KsefClient::new("https://api.ksef.mf.gov.pl".to_string(), 2000).unwrap();
+    let client = ksef::KsefClient::new("https://api.ksef.mf.gov.pl".to_string(), 2000).unwrap();
 
-    let company_info = ksef_client::CompanyInfo {
+    let company_info = ksef::CompanyInfo {
         ksef_token: "<ksef_token>".to_string(),
         nip: "<nip>".to_string(),
     };

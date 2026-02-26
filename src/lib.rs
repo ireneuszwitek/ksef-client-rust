@@ -24,6 +24,7 @@ mod utils;
 pub struct KsefClient {
     base_url: String,
     sleep_time: u64,
+    max_attempts: i32,
     public_certificates: RefCell<Option<Vec<models::PemCertificateInfo>>>,
 }
 
@@ -39,15 +40,25 @@ impl KsefClient {
             .to_string()
             .trim_end_matches('/')
             .to_string();
+        
+        let poll_timeout = Duration::from_secs(2 * 60); // 2 minutes
+        let total_millis = poll_timeout.as_millis();
+        let max_attempts = std::cmp::max(1, (total_millis / sleep_time as u128) as i32);
+
         Ok(Self {
             base_url,
             sleep_time,
+            max_attempts,
             public_certificates: RefCell::new(None),
         })
     }
 
     fn join_url(&self, url: &str) -> String {
         format!("{}{}", self.base_url, url)
+    }
+
+    pub async fn get_encryption_data(&self) -> Result<models::EncryptionData, &str> {
+        cryptography::get_encryption_data(&self).await
     }
 
     pub async fn get_access_tokens(
@@ -101,10 +112,6 @@ impl KsefClient {
             }
         };
 
-        let poll_timeout = Duration::from_secs(2 * 60); // 2 minuty
-        let total_millis = poll_timeout.as_millis();
-        let max_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
-
         let _ = utils::pool(
             || {
                 self.get_auth_status(
@@ -113,7 +120,7 @@ impl KsefClient {
                 )
             },
             |result| result.status.code == 200,
-            max_attempts,
+            self.max_attempts,
             self.sleep_time,
         )
         .await;
@@ -247,19 +254,42 @@ impl KsefClient {
         &self,
         auth_operation_reference_number: &String,
         authentication_token: &String,
-    ) -> Result<models::AuthStatus, reqwest::Error> {
+    ) -> Result<models::AuthStatus, models::ErrorResponse> {
         let escaped = encode(auth_operation_reference_number);
         let url = format!("/v2/auth/{}", escaped);
 
         let reqwest_client = reqwest::Client::new();
-        let result = reqwest_client
+        let response = reqwest_client
             .get(self.join_url(url.as_str()))
             .bearer_auth(&authentication_token)
             .send()
-            .await?
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(response
             .json::<models::AuthStatus>()
-            .await?;
-        Ok(result)
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "invalid_response".into(),
+                message: "Failed to parse success response".into(),
+            })?)
     }
 
     async fn get_access_token_by_authentication_token(
@@ -302,18 +332,41 @@ impl KsefClient {
         &self,
         reference_number: &String,
         access_token: &String,
-    ) -> Result<invoice::InvoiceExportStatusResponse, reqwest::Error> {
+    ) -> Result<invoice::InvoiceExportStatusResponse, models::ErrorResponse> {
         let url = format!("/v2/invoices/exports/{}", encode(reference_number));
 
         let reqwest_client = reqwest::Client::new();
-        let result = reqwest_client
+        let response = reqwest_client
             .get(self.join_url(url.as_str()))
             .bearer_auth(&access_token)
             .send()
-            .await?
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(response
             .json::<invoice::InvoiceExportStatusResponse>()
-            .await?;
-        Ok(result)
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "invalid_response".into(),
+                message: "Failed to parse success response".into(),
+            })?)
     }
 
     pub async fn invoice_export(
@@ -321,7 +374,7 @@ impl KsefClient {
         filters: &invoice::InvoiceQueryFilters,
         access_token: &String,
     ) -> Result<invoice::InvoiceExportResult, models::ErrorResponse> {
-        let encryption = match cryptography::get_encryption_data(&self).await {
+        let encryption = match self.get_encryption_data().await {
             Ok(encryption) => encryption,
             Err(e) => {
                 return Err(models::ErrorResponse {
@@ -349,10 +402,6 @@ impl KsefClient {
             }
         };
 
-        let poll_timeout = Duration::from_secs(2 * 60); // 2 minuty
-        let total_millis = poll_timeout.as_millis();
-        let max_attempts = std::cmp::max(1, (total_millis / self.sleep_time as u128) as i32);
-
         let invoice_export_status = match utils::pool(
             || {
                 self.get_invoice_export_status(
@@ -361,7 +410,7 @@ impl KsefClient {
                 )
             },
             |result| result.status.code == 200,
-            max_attempts,
+            self.max_attempts,
             self.sleep_time,
         )
         .await
@@ -511,5 +560,259 @@ impl KsefClient {
         })?;
 
         Ok(png_bytes)
+    }
+
+    pub async fn open_online_session(
+        &self,
+        encryption: &models::EncryptionData,
+        access_token: &String,
+        system_code: &invoice::SystemCode,
+    ) -> Result<models::OpenOnlineSessionResponse, models::ErrorResponse> {
+        let form_code = models::FormCode {
+            system_code: system_code.system_code().into(),
+            schema_version: system_code.schema_version().into(),
+            value: system_code.value().into(),
+        };
+
+        let request = models::OpenOnlineSessionRequest {
+            form_code,
+            encryption: encryption.encryption_info.clone(),
+        };
+
+        let url = "/v2/sessions/online";
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .post(self.join_url(url))
+            .json(&request)
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(response
+            .json::<models::OpenOnlineSessionResponse>()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "invalid_response".into(),
+                message: "Failed to parse success response".into(),
+            })?)
+    }
+
+    pub async fn close_online_session(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<(), models::ErrorResponse> {
+        let url = format!("/v2/sessions/online/{}/close", encode(reference_number));
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .post(self.join_url(url.as_str()))
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(())
+    }
+
+    pub async fn send_invoice(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+        encryption: &models::EncryptionData,
+        xml: &String,
+    ) -> Result<invoice::OperationResponse, models::ErrorResponse> {
+        let invoice = xml.as_bytes().to_vec();
+
+        let encrypted_invoice = cryptography::encrypt_bytes_with_aes256(
+            &invoice,
+            &encryption.cipher_key,
+            &encryption.cipher_iv,
+        );
+
+        let invoice_metadata = cryptography::get_metadata(&invoice);
+        let encrypted_metadata = cryptography::get_metadata(&encrypted_invoice);
+
+        let request = invoice::SendInvoiceRequest {
+            invoice_hash: invoice_metadata.hash_sha,
+            invoice_size: invoice_metadata.file_size as i64,
+            encrypted_invoice_hash: encrypted_metadata.hash_sha,
+            encrypted_invoice_size: encrypted_metadata.file_size as i64,
+            encrypted_invoice_content: STANDARD.encode(encrypted_invoice),
+            offline_mode: false,
+            hash_of_corrected_invoice: None,
+        };
+
+        // println!("{:#?}", request);
+
+        // return Err(models::ErrorResponse {
+        //             code: "request_error".into(),
+        //             message: "Request error".into(),
+        //         });
+
+        let url = format!("/v2/sessions/online/{}/invoices", encode(reference_number));
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .post(self.join_url(url.as_str()))
+            .json(&request)
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(response
+            .json::<invoice::OperationResponse>()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "invalid_response".into(),
+                message: "Failed to parse success response".into(),
+            })?)
+    }
+
+    async fn get_session_status(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
+        let url = format!("/v2/sessions/{}", encode(reference_number));
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .get(self.join_url(url.as_str()))
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let err = response
+                .json::<models::ErrorResponse>()
+                .await
+                .unwrap_or_else(|_| models::ErrorResponse {
+                    code: status.as_str().to_string(),
+                    message: format!("Server returned HTTP {}", status),
+                });
+
+            return Err(err);
+        }
+
+        Ok(response
+            .json::<models::SessionStatusResponse>()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "invalid_response".into(),
+                message: "Failed to parse success response".into(),
+            })?)
+    }
+
+    async fn try_get_online_session_status(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
+        let mut attempt = 0;
+
+        loop {
+            if let Ok(status_response) = self
+                .get_session_status(&reference_number, &access_token)
+                .await
+            {
+                if status_response.successful_invoice_count.is_some() {
+                    return Ok(status_response);
+                }
+
+                if attempt >= self.max_attempts {
+                    return Ok(status_response);
+                }
+            }
+
+            attempt += 1;
+            tokio::time::sleep(tokio::time::Duration::from_millis(self.sleep_time)).await;
+        }
+    }
+
+    pub async fn get_online_session_status(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
+
+        let online_session_status = match utils::pool(
+            || self.try_get_online_session_status(&reference_number, &access_token),
+            |result| result.invoice_count == result.successful_invoice_count,
+            self.max_attempts,
+            self.sleep_time,
+        )
+        .await
+        {
+            Ok(online_session_status) => online_session_status,
+            Err(_) => {
+                return Err(models::ErrorResponse {
+                    code: "invoice_export_status_error".into(),
+                    message: "invoice_export_status_error".into(), //e.into(),
+                });
+            }
+        };
+
+        Ok(online_session_status)
     }
 }

@@ -115,12 +115,15 @@ pub(crate) struct SignatureResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OperationStatusInfo {
+pub struct OperationStatusInfo {
     #[serde(rename = "code")]
-    pub(crate) code: i32,
+    pub code: i32,
 
     #[serde(rename = "description")]
-    pub(crate) description: String,
+    pub description: String,
+    
+    #[serde(rename = "details")] 
+    pub details: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,3 +195,67 @@ pub(crate) struct RefreshTokenResponse {
     pub(crate) access_token: TokenInfo,
 }
 
+// Sessions
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FormCode {
+    #[serde(rename = "systemCode")]
+    pub system_code: String,
+
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+
+    #[serde(rename = "value")]
+    pub value: String,
+}
+
+// Online session
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenOnlineSessionRequest {
+    #[serde(rename = "formCode")]
+    pub form_code: FormCode,
+
+    #[serde(rename = "encryption")]
+    pub encryption: EncryptionInfo,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenOnlineSessionResponse {
+    #[serde(rename = "referenceNumber")]
+    pub reference_number: String,
+
+    #[serde(rename = "validUntil")]
+    pub valid_until: DateTime<FixedOffset>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionStatusResponse {
+    #[serde(rename = "status")]
+    pub status: OperationStatusInfo,
+
+    #[serde(rename = "invoiceCount")]
+    pub invoice_count: Option<i32>,
+
+    #[serde(rename = "successfulInvoiceCount")]
+    pub successful_invoice_count: Option<i32>,
+
+    #[serde(rename = "failedInvoiceCount")]
+    pub failed_invoice_count: Option<i32>,
+
+    #[serde(rename = "validUntil")]
+    pub valid_until: Option<DateTime<FixedOffset>>,
+
+    #[serde(rename = "dateCreated")]
+    pub date_created: DateTime<FixedOffset>,
+
+    #[serde(rename = "dateUpdated")]
+    pub date_updated: DateTime<FixedOffset>,
+}
+
+#[derive(Debug)]
+pub struct FileMetadata {
+    pub file_size: usize,
+    pub hash_sha: String,
+}

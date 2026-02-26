@@ -4,6 +4,50 @@ use std::fmt;
 use std::collections::HashMap;
 use crate::models;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub enum SystemCode {
+    #[serde(rename = "FA (2)")]
+    FA2,
+
+    #[serde(rename = "FA (3)")]
+    FA3,
+
+    #[serde(rename = "PEF (3)")]
+    PEF,
+
+    #[serde(rename = "PEF_KOR (3)")]
+    PEFKOR,
+}
+
+impl SystemCode {
+    pub fn system_code(self) -> &'static str {
+        match self {
+            SystemCode::FA2 => "FA (2)",
+            SystemCode::FA3 => "FA (3)",
+            SystemCode::PEF => "PEF (3)",
+            SystemCode::PEFKOR => "PEF_KOR (3)",
+        }
+    }
+
+    pub fn value(self) -> &'static str {
+        match self {
+            SystemCode::FA2 => "FA",
+            SystemCode::FA3 => "FA",
+            SystemCode::PEF => "PEF",
+            SystemCode::PEFKOR => "PEF",
+        }
+    }
+
+    pub fn schema_version(self) -> &'static str {
+        match self {
+            SystemCode::FA2 => "1-0E",
+            SystemCode::FA3 => "1-0E",
+            SystemCode::PEF => "2-1",
+            SystemCode::PEFKOR => "2-1",
+        }
+    }
+}
+
 /////////////////////////////////
 ///  Invoice query
 /////////////////////////////////
@@ -394,4 +438,32 @@ pub struct InvoiceExportResult {
     pub is_truncated: bool,
     pub last_permanent_storage_date: Option<DateTime<Utc>>,
     pub permanent_storage_hwm_date: Option<DateTime<Utc>>,
+}
+
+/////////////////////////////////
+///  Send invoice 
+/////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SendInvoiceRequest {
+    #[serde(rename = "invoiceHash")]
+    pub invoice_hash: String,
+
+    #[serde(rename = "invoiceSize")]
+    pub invoice_size: i64,
+
+    #[serde(rename = "encryptedInvoiceHash")]
+    pub encrypted_invoice_hash: String,
+
+    #[serde(rename = "encryptedInvoiceSize")]
+    pub encrypted_invoice_size: i64,
+
+    #[serde(rename = "encryptedInvoiceContent")]
+    pub encrypted_invoice_content: String,
+
+    #[serde(rename = "offlineMode")]
+    pub offline_mode: bool,
+
+    #[serde(rename = "hashOfCorrectedInvoice")]
+    pub hash_of_corrected_invoice: Option<String>,
 }

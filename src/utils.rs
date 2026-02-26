@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::io::{Read, Seek};
 use tokio::time::{Duration, sleep};
 use zip::ZipArchive;
+use crate::models;
+
 
 pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
     let mut archive = ZipArchive::new(zip_stream).unwrap();
@@ -26,7 +28,7 @@ pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
 pub(crate) async fn pool<T, FAction, FutA, FCond>(action: FAction, condition: FCond, max_attempts: i32, delay_ms: u64) -> Result<T, &'static str>
 where
     FAction: Fn() -> FutA,
-    FutA: Future<Output = Result<T, reqwest::Error>>,
+    FutA: Future<Output = Result<T, models::ErrorResponse>>,
     FCond: Fn(&T) -> bool,
 {
     for _ in 1..=max_attempts {
