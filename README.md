@@ -13,9 +13,9 @@ Przykłady użycia biblioteki znajdują się w katalogu `examples`
 - `get_access_token.rs` - autentykacja i pobranie access_token
 - `refresh_token.rs` - odświeżenie wygasłego access_token
 - `query_invoice_metadata.rs` - pobieranie listy faktur ze stronicowaniem
-- `invoice_export.rs` - eksport faktur używany do przyrostowego pobiernia faktur
-- `qrcode.rs` - generowanie kodu QR
-- `invoice_send_online.rs` - wysłanie faktury w trybie online
+- `export_invoice.rs` - eksport faktur używany do przyrostowego pobiernia faktur
+- `get_invoice_qrcode.rs` - generowanie kodu QR faktury
+- `send_invoice_online.rs` - wysłanie faktury w trybie online
 
 ## 🔧 Instalacja
 
@@ -23,7 +23,7 @@ Dodaj do `Cargo.toml`:
 
 ```toml
 [dependencies]
-ksef = "0.4"
+ksef = "0.5"
 tokio = { version = "1.37", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"]} 
 ```

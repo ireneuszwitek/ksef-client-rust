@@ -30,7 +30,7 @@ async fn main() {
     println!("{:#?}", open_online_session_result);
 
     // Load invoice xml
-    let xml = std::fs::read_to_string("invoice.xml").expect("Failed to read file");
+    let xml = std::fs::read_to_string("<path>/invoice.xml").expect("Failed to read file");
 
     println!("{}", xml);
 

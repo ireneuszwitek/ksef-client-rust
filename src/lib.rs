@@ -309,9 +309,9 @@ impl KsefClient {
         Ok(result)
     }
 
-    async fn start_invoices_export(
+    async fn start_export_invoices(
         &self,
-        request: &invoice::InvoiceExportRequest,
+        request: &invoice::ExportInvoiceRequest,
         access_token: &String,
     ) -> Result<invoice::OperationResponse, reqwest::Error> {
         let url = "/v2/invoices/exports";
@@ -328,11 +328,11 @@ impl KsefClient {
         Ok(result)
     }
 
-    async fn get_invoice_export_status(
+    async fn get_export_invoice_status(
         &self,
         reference_number: &String,
         access_token: &String,
-    ) -> Result<invoice::InvoiceExportStatusResponse, models::ErrorResponse> {
+    ) -> Result<invoice::ExportInvoiceStatusResponse, models::ErrorResponse> {
         let url = format!("/v2/invoices/exports/{}", encode(reference_number));
 
         let reqwest_client = reqwest::Client::new();
@@ -361,7 +361,7 @@ impl KsefClient {
         }
 
         Ok(response
-            .json::<invoice::InvoiceExportStatusResponse>()
+            .json::<invoice::ExportInvoiceStatusResponse>()
             .await
             .map_err(|_| models::ErrorResponse {
                 code: "invalid_response".into(),
@@ -369,11 +369,11 @@ impl KsefClient {
             })?)
     }
 
-    pub async fn invoice_export(
+    pub async fn export_invoice(
         &self,
         filters: &invoice::InvoiceQueryFilters,
         access_token: &String,
-    ) -> Result<invoice::InvoiceExportResult, models::ErrorResponse> {
+    ) -> Result<invoice::ExportInvoiceResult, models::ErrorResponse> {
         let encryption = match self.get_encryption_data().await {
             Ok(encryption) => encryption,
             Err(e) => {
@@ -384,28 +384,28 @@ impl KsefClient {
             }
         };
 
-        let invoice_export_request = invoice::InvoiceExportRequest {
+        let export_invoice_request = invoice::ExportInvoiceRequest {
             encryption: encryption.encryption_info.clone(),
             filters: (*filters).clone(),
         };
 
-        let start_invoices_export = match self
-            .start_invoices_export(&invoice_export_request, &access_token)
+        let start_export_invoices = match self
+            .start_export_invoices(&export_invoice_request, &access_token)
             .await
         {
-            Ok(start_invoices_export) => start_invoices_export,
+            Ok(start_export_invoices) => start_export_invoices,
             Err(e) => {
                 return Err(models::ErrorResponse {
-                    code: "start_invoices_export_error".into(),
+                    code: "start_export_invoices_error".into(),
                     message: format!("Status: {}", e),
                 });
             }
         };
 
-        let invoice_export_status = match utils::pool(
+        let export_invoice_status = match utils::pool(
             || {
-                self.get_invoice_export_status(
-                    &start_invoices_export.reference_number,
+                self.get_export_invoice_status(
+                    &start_export_invoices.reference_number,
                     &access_token,
                 )
             },
@@ -418,7 +418,7 @@ impl KsefClient {
             Ok(export_status) => export_status,
             Err(e) => {
                 return Err(models::ErrorResponse {
-                    code: "invoice_export_status_error".into(),
+                    code: "export_invoice_status_error".into(),
                     message: e.into(),
                 });
             }
@@ -427,9 +427,9 @@ impl KsefClient {
         let mut metadata_summaries: Vec<invoice::InvoiceSummary> = Vec::new();
         let mut xml_files: HashMap<String, String> = HashMap::new();
 
-        if !invoice_export_status.package.parts.is_empty() {
+        if !export_invoice_status.package.parts.is_empty() {
             let decrypted_archive_stream = match self
-                .download_package_parts(&invoice_export_status.package.parts, &encryption)
+                .download_package_parts(&export_invoice_status.package.parts, &encryption)
                 .await
             {
                 Ok(decrypted_archive_stream) => decrypted_archive_stream,
@@ -458,12 +458,12 @@ impl KsefClient {
             }
         }
 
-        let result = invoice::InvoiceExportResult {
+        let result = invoice::ExportInvoiceResult {
             metadata_summaries: metadata_summaries,
             xml_files: xml_files,
-            is_truncated: invoice_export_status.package.is_truncated,
-            last_permanent_storage_date: invoice_export_status.package.last_permanent_storage_date,
-            permanent_storage_hwm_date: invoice_export_status.package.permanent_storage_hwm_date,
+            is_truncated: export_invoice_status.package.is_truncated,
+            last_permanent_storage_date: export_invoice_status.package.last_permanent_storage_date,
+            permanent_storage_hwm_date: export_invoice_status.package.permanent_storage_hwm_date,
         };
 
         Ok(result)
@@ -471,7 +471,7 @@ impl KsefClient {
 
     async fn download_package_parts(
         &self,
-        parts: &Vec<invoice::InvoiceExportPackagePart>,
+        parts: &Vec<invoice::ExportInvoicePackagePart>,
         encryption: &models::EncryptionData,
     ) -> Result<Cursor<Vec<u8>>, &str> {
         let mut buffer = Cursor::new(Vec::new());
@@ -503,7 +503,7 @@ impl KsefClient {
 
     async fn download_package_part(
         &self,
-        part: &invoice::InvoiceExportPackagePart,
+        part: &invoice::ExportInvoicePackagePart,
     ) -> Result<Vec<u8>, &str> {
         let method_str = if part.method.is_empty() {
             "GET"
@@ -807,8 +807,8 @@ impl KsefClient {
             Ok(online_session_status) => online_session_status,
             Err(_) => {
                 return Err(models::ErrorResponse {
-                    code: "invoice_export_status_error".into(),
-                    message: "invoice_export_status_error".into(), //e.into(),
+                    code: "export_invoice_status_error".into(),
+                    message: "export_invoice_status_error".into(), //e.into(),
                 });
             }
         };

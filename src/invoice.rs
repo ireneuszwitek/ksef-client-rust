@@ -336,7 +336,7 @@ pub struct AuthorizedSubject {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct InvoiceExportRequest {
+pub struct ExportInvoiceRequest {
     /// Informacje o szyfrowaniu paczki (RSA OAEP-SHA256, Base64).
     #[serde(rename = "Encryption")]
     pub encryption: models::EncryptionInfo,
@@ -355,7 +355,7 @@ pub struct OperationResponse {
 // Export status response
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct InvoiceExportStatusResponse {
+pub(crate) struct ExportInvoiceStatusResponse {
     #[serde(rename = "status")]
     pub(crate) status: models::OperationStatusInfo,
 
@@ -366,11 +366,11 @@ pub(crate) struct InvoiceExportStatusResponse {
     pub(crate) package_expiration_date: Option<DateTime<Utc>>,
 
     #[serde(rename = "package")]
-    pub(crate) package: InvoiceExportPackage,
+    pub(crate) package: ExportInvoicePackage,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InvoiceExportPackage {
+pub struct ExportInvoicePackage {
     #[serde(rename = "invoiceCount")]
     pub invoice_count: i32,
 
@@ -378,7 +378,7 @@ pub struct InvoiceExportPackage {
     pub size: i64,
 
     #[serde(rename = "parts")]
-    pub parts: Vec<InvoiceExportPackagePart>,
+    pub parts: Vec<ExportInvoicePackagePart>,
 
     #[serde(rename = "isTruncated")]
     pub is_truncated: bool,
@@ -397,7 +397,7 @@ pub struct InvoiceExportPackage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InvoiceExportPackagePart {
+pub struct ExportInvoicePackagePart {
     #[serde(rename = "ordinalNumber")]
     pub ordinal_number: i32,
 
@@ -432,7 +432,7 @@ pub struct InvoicePackageMetadata {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InvoiceExportResult {
+pub struct ExportInvoiceResult {
     pub metadata_summaries: Vec<InvoiceSummary>,
     pub xml_files: HashMap<String, String>,
     pub is_truncated: bool,
