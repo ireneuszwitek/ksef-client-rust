@@ -48,3 +48,38 @@ where
 
     Err("Maximum number of attempts exceeded")    
 }
+
+
+pub(crate) async fn handle_response<T>(
+    response: Result<reqwest::Response, reqwest::Error>,
+) -> Result<T, models::ErrorResponse>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let response = response.map_err(|_| models::ErrorResponse {
+        code: "request_error".into(),
+        message: "Request error".into(),
+    })?;
+
+    let status = response.status();
+
+    if !status.is_success() {
+        let err = response
+            .json::<models::ErrorResponse>()
+            .await
+            .unwrap_or_else(|_| models::ErrorResponse {
+                code: status.as_str().to_string(),
+                message: format!("Server returned HTTP {}", status),
+            });
+
+        return Err(err);
+    }
+
+    response
+        .json::<T>()
+        .await
+        .map_err(|_| models::ErrorResponse {
+            code: "invalid_response".into(),
+            message: "Failed to parse success response".into(),
+        })
+}

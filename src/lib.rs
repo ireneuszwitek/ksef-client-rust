@@ -263,33 +263,9 @@ impl KsefClient {
             .get(self.join_url(url.as_str()))
             .bearer_auth(&authentication_token)
             .send()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "request_error".into(),
-                message: "Request error".into(),
-            })?;
+            .await;
 
-        let status = response.status();
-
-        if !status.is_success() {
-            let err = response
-                .json::<models::ErrorResponse>()
-                .await
-                .unwrap_or_else(|_| models::ErrorResponse {
-                    code: status.as_str().to_string(),
-                    message: format!("Server returned HTTP {}", status),
-                });
-
-            return Err(err);
-        }
-
-        Ok(response
-            .json::<models::AuthStatus>()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "invalid_response".into(),
-                message: "Failed to parse success response".into(),
-            })?)
+        utils::handle_response::<models::AuthStatus>(response).await
     }
 
     async fn get_access_token_by_authentication_token(
@@ -340,33 +316,9 @@ impl KsefClient {
             .get(self.join_url(url.as_str()))
             .bearer_auth(&access_token)
             .send()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "request_error".into(),
-                message: "Request error".into(),
-            })?;
+            .await;
 
-        let status = response.status();
-
-        if !status.is_success() {
-            let err = response
-                .json::<models::ErrorResponse>()
-                .await
-                .unwrap_or_else(|_| models::ErrorResponse {
-                    code: status.as_str().to_string(),
-                    message: format!("Server returned HTTP {}", status),
-                });
-
-            return Err(err);
-        }
-
-        Ok(response
-            .json::<invoice::ExportInvoiceStatusResponse>()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "invalid_response".into(),
-                message: "Failed to parse success response".into(),
-            })?)
+        utils::handle_response::<invoice::ExportInvoiceStatusResponse>(response).await
     }
 
     pub async fn export_invoice(
@@ -587,33 +539,9 @@ impl KsefClient {
             .json(&request)
             .bearer_auth(&access_token)
             .send()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "request_error".into(),
-                message: "Request error".into(),
-            })?;
+            .await;
 
-        let status = response.status();
-
-        if !status.is_success() {
-            let err = response
-                .json::<models::ErrorResponse>()
-                .await
-                .unwrap_or_else(|_| models::ErrorResponse {
-                    code: status.as_str().to_string(),
-                    message: format!("Server returned HTTP {}", status),
-                });
-
-            return Err(err);
-        }
-
-        Ok(response
-            .json::<models::OpenOnlineSessionResponse>()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "invalid_response".into(),
-                message: "Failed to parse success response".into(),
-            })?)
+        utils::handle_response::<models::OpenOnlineSessionResponse>(response).await
     }
 
     pub async fn close_online_session(
@@ -648,7 +576,7 @@ impl KsefClient {
             return Err(err);
         }
 
-        Ok(())
+        Ok(())    
     }
 
     pub async fn send_invoice(
@@ -679,13 +607,6 @@ impl KsefClient {
             hash_of_corrected_invoice: None,
         };
 
-        // println!("{:#?}", request);
-
-        // return Err(models::ErrorResponse {
-        //             code: "request_error".into(),
-        //             message: "Request error".into(),
-        //         });
-
         let url = format!("/v2/sessions/online/{}/invoices", encode(reference_number));
 
         let reqwest_client = reqwest::Client::new();
@@ -694,33 +615,9 @@ impl KsefClient {
             .json(&request)
             .bearer_auth(&access_token)
             .send()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "request_error".into(),
-                message: "Request error".into(),
-            })?;
+            .await;
 
-        let status = response.status();
-
-        if !status.is_success() {
-            let err = response
-                .json::<models::ErrorResponse>()
-                .await
-                .unwrap_or_else(|_| models::ErrorResponse {
-                    code: status.as_str().to_string(),
-                    message: format!("Server returned HTTP {}", status),
-                });
-
-            return Err(err);
-        }
-
-        Ok(response
-            .json::<invoice::OperationResponse>()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "invalid_response".into(),
-                message: "Failed to parse success response".into(),
-            })?)
+        utils::handle_response::<invoice::OperationResponse>(response).await
     }
 
     async fn get_session_status(
@@ -735,33 +632,9 @@ impl KsefClient {
             .get(self.join_url(url.as_str()))
             .bearer_auth(&access_token)
             .send()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "request_error".into(),
-                message: "Request error".into(),
-            })?;
+            .await;
 
-        let status = response.status();
-
-        if !status.is_success() {
-            let err = response
-                .json::<models::ErrorResponse>()
-                .await
-                .unwrap_or_else(|_| models::ErrorResponse {
-                    code: status.as_str().to_string(),
-                    message: format!("Server returned HTTP {}", status),
-                });
-
-            return Err(err);
-        }
-
-        Ok(response
-            .json::<models::SessionStatusResponse>()
-            .await
-            .map_err(|_| models::ErrorResponse {
-                code: "invalid_response".into(),
-                message: "Failed to parse success response".into(),
-            })?)
+        utils::handle_response::<models::SessionStatusResponse>(response).await
     }
 
     async fn try_get_online_session_status(
