@@ -16,6 +16,7 @@ Przykłady użycia biblioteki znajdują się w katalogu `examples`
 - `export_invoice.rs` - eksport faktur używany do przyrostowego pobiernia faktur
 - `get_invoice_qrcode.rs` - generowanie kodu QR faktury
 - `send_invoice_online.rs` - wysłanie faktury w trybie online
+- `send_invoice_batch.rs` - wysłanie faktur w trybie wsadowym
 
 ## 🔧 Instalacja
 
@@ -23,7 +24,7 @@ Dodaj do `Cargo.toml`:
 
 ```toml
 [dependencies]
-ksef = "0.5"
+ksef = "0.6"
 tokio = { version = "1.37", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"]} 
 ```

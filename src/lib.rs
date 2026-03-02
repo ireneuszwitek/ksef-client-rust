@@ -21,8 +21,35 @@ mod models;
 mod qr;
 mod utils;
 
+
+#[derive(Debug, Clone, Copy)]
+pub enum Environment {
+    Prod,
+    Test,
+    Demo,
+}
+
+impl Environment {
+    fn base_url(&self) -> &'static str {
+        match self {
+            Environment::Test => "https://api-test.ksef.mf.gov.pl",
+            Environment::Demo => "https://api-demo.ksef.mf.gov.pl",
+            Environment::Prod => "https://api.ksef.mf.gov.pl",
+        }
+    }
+
+    fn qr_url(&self) -> &'static str {
+        match self {
+            Environment::Test => "https://qr-test.ksef.mf.gov.pl",
+            Environment::Demo => "https://qr-demo.ksef.mf.gov.pl",
+            Environment::Prod => "https://qr.ksef.mf.gov.pl",
+        }
+    }
+}
+
 pub struct KsefClient {
     base_url: String,
+    qr_url: String,
     sleep_time: u64,
     max_attempts: i32,
     public_certificates: RefCell<Option<Vec<models::PemCertificateInfo>>>,
@@ -34,19 +61,15 @@ pub struct CompanyInfo {
 }
 
 impl KsefClient {
-    pub fn new(base_url: String, sleep_time: u64) -> Result<Self, url::ParseError> {
-        let base_url_parsed = url::Url::parse(&base_url)?;
-        let base_url = base_url_parsed
-            .to_string()
-            .trim_end_matches('/')
-            .to_string();
-        
+    pub fn new(environment: Environment, sleep_time: u64) -> Result<Self, url::ParseError> {
+
         let poll_timeout = Duration::from_secs(2 * 60); // 2 minutes
         let total_millis = poll_timeout.as_millis();
         let max_attempts = std::cmp::max(1, (total_millis / sleep_time as u128) as i32);
 
         Ok(Self {
-            base_url,
+            base_url: environment.base_url().to_string(),
+            qr_url: environment.qr_url().to_string(),
             sleep_time,
             max_attempts,
             public_certificates: RefCell::new(None),
@@ -491,14 +514,13 @@ impl KsefClient {
 
     pub async fn get_qrcode(
         &self,
-        base_url: &String,
         nip: &String,
         issue_date: &DateTime<Utc>,
         invoice_hash: &String,
         resolution_px: Option<u32>,
     ) -> Result<Vec<u8>, models::ErrorResponse> {
         let invoice_for_online_url =
-            qr::build_invoice_verification_url(&base_url, nip, &issue_date, &invoice_hash)
+            qr::build_invoice_verification_url(&self.qr_url, nip, &issue_date, &invoice_hash)
                 .map_err(|_| models::ErrorResponse {
                     code: "build_url_error".into(),
                     message: "Building invoice URL failed".into(),
@@ -576,7 +598,7 @@ impl KsefClient {
             return Err(err);
         }
 
-        Ok(())    
+        Ok(())
     }
 
     pub async fn send_invoice(
@@ -637,7 +659,7 @@ impl KsefClient {
         utils::handle_response::<models::SessionStatusResponse>(response).await
     }
 
-    async fn try_get_online_session_status(
+    async fn try_get_session_status(
         &self,
         reference_number: &String,
         access_token: &String,
@@ -668,24 +690,272 @@ impl KsefClient {
         reference_number: &String,
         access_token: &String,
     ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
-
-        let online_session_status = match utils::pool(
-            || self.try_get_online_session_status(&reference_number, &access_token),
+        let session_status = match utils::pool(
+            || self.try_get_session_status(&reference_number, &access_token),
             |result| result.invoice_count == result.successful_invoice_count,
             self.max_attempts,
             self.sleep_time,
         )
         .await
         {
-            Ok(online_session_status) => online_session_status,
+            Ok(session_status) => session_status,
             Err(_) => {
                 return Err(models::ErrorResponse {
-                    code: "export_invoice_status_error".into(),
-                    message: "export_invoice_status_error".into(), //e.into(),
+                    code: "get_session_status_error".into(),
+                    message: "get_session_status_error".into(), //e.into(),
                 });
             }
         };
 
-        Ok(online_session_status)
+        Ok(session_status)
+    }
+
+    pub async fn open_batch_session(
+        &self,
+        request: &models::OpenBatchSessionRequest,
+        access_token: &String,
+    ) -> Result<models::OpenBatchSessionResponse, models::ErrorResponse> {
+        let url = "/v2/sessions/batch";
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .post(self.join_url(url))
+            .json(&request)
+            .bearer_auth(&access_token)
+            .send()
+            .await;
+
+        utils::handle_response::<models::OpenBatchSessionResponse>(response).await
+    }
+
+    async fn send_package_parts(
+        &self,
+        parts: &Vec<models::PackagePartSignatureInitResponseType>,
+        batch_part_sending_infos: &Vec<models::BatchPartSendingInfo>,
+    ) -> Result<(), models::ErrorResponse> {
+        let mut errors: Vec<String> = Vec::new();
+
+        for part in parts {
+            let file_info = match batch_part_sending_infos
+                .iter()
+                .find(|x| x.ordinal_number == part.ordinal_number)
+            {
+                Some(file_info) => file_info,
+                None => {
+                    errors.push(format!(
+                        "Brak danych dla części paczki {}",
+                        part.ordinal_number
+                    ));
+                    continue;
+                }
+            };
+
+            let method = if let Ok(method) = reqwest::Method::from_bytes(part.method.as_bytes()) {
+                method
+            } else {
+                errors.push(format!(
+                    "Brak metody HTTP dla części paczki {}",
+                    part.ordinal_number
+                ));
+                continue;
+            };
+
+            let reqwest_client = reqwest::Client::new();
+            let mut request = reqwest_client.request(method, &part.url);
+
+            for (k, v) in &part.headers {
+                request = request.header(k.as_str(), v.as_str());
+            }
+
+            let response = match request.body(file_info.data.clone()).send().await {
+                Ok(response) => response,
+                Err(e) => {
+                    errors.push(format!(
+                        "Błąd wysyłki części paczki {}: {}",
+                        part.ordinal_number, e
+                    ));
+                    continue;
+                }
+            };
+
+            if !response.status().is_success() {
+                errors.push(format!(
+                    "Błąd wysyłki części paczki {}: {}",
+                    part.ordinal_number,
+                    response.status()
+                ));
+                continue;
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(models::ErrorResponse {
+                code: "send_package_parts_error".into(),
+                message: errors.join("\n"),
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn close_batch_session(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<bool, models::ErrorResponse> {
+        let url = format!("/v2/sessions/batch/{}/close", encode(reference_number));
+
+        let reqwest_client = reqwest::Client::new();
+        let response = reqwest_client
+            .post(self.join_url(url.as_str()))
+            .bearer_auth(&access_token)
+            .send()
+            .await
+            .map_err(|_| models::ErrorResponse {
+                code: "request_error".into(),
+                message: "Request error".into(),
+            })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(models::ErrorResponse {
+                code: status.as_str().to_string(),
+                message: format!("Server returned HTTP {}", status),
+            });
+        }
+
+        Ok(true)
+    }
+
+    async fn get_batch_session_status(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+    ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
+        let session_status = match utils::pool(
+            || self.try_get_session_status(&reference_number, &access_token),
+            |result| result.status.code == 200,
+            self.max_attempts,
+            self.sleep_time,
+        )
+        .await
+        {
+            Ok(session_status) => session_status,
+            Err(_) => {
+                return Err(models::ErrorResponse {
+                    code: "get_session_status_error".into(),
+                    message: "get_session_status_error".into(), //e.into(),
+                });
+            }
+        };
+
+        Ok(session_status)
+    }
+
+    pub async fn send_invoice_batch(
+        &self,
+        access_token: &String,
+        system_code: &invoice::SystemCode,
+        list: &Vec<(String, String)>,
+        part_count: usize,
+    ) -> Result<models::SessionStatusResponse, models::ErrorResponse> {
+        // Generate encryption
+        let encryption = match self.get_encryption_data().await {
+            Ok(encryption) => encryption,
+            Err(e) => {
+                return Err(models::ErrorResponse {
+                    code: "encryption_error".into(),
+                    message: e.into(),
+                });
+            }
+        };
+
+        let form_code = models::FormCode {
+            system_code: system_code.system_code().into(),
+            schema_version: system_code.schema_version().into(),
+            value: system_code.value().into(),
+        };
+
+        let (zip_bytes, zip_meta) = utils::build_zip(&list);
+
+        let encrypted_parts = utils::encrypt_and_split(&zip_bytes, &encryption, Some(part_count));
+
+        if encrypted_parts.len() < 1 {
+            return Err(models::ErrorResponse {
+                code: "part_size_error".into(),
+                message: "the number of parts is less than 1".into(),
+            });
+        }
+
+        let parts: Vec<_> = encrypted_parts
+            .iter()
+            .map(|p| models::BatchFilePartInfo {
+                ordinal_number: p.ordinal_number,
+                file_size: p.metadata.file_size,
+                file_hash: p.metadata.hash_sha.clone(),
+            })
+            .collect();
+
+        let open_batch_request = models::OpenBatchSessionRequest {
+            form_code: form_code,
+            batch_file: models::BatchFileInfo {
+                file_size: zip_meta.file_size,
+                file_hash: zip_meta.hash_sha,
+                file_parts: parts,
+            },
+            encryption: encryption.encryption_info,
+            offline_mode: false,
+        };
+
+        let open_batch_session_response = match self
+            .open_batch_session(&open_batch_request, access_token)
+            .await
+        {
+            Ok(open_batch_session_response) => open_batch_session_response,
+            Err(e) => {
+                return Err(models::ErrorResponse {
+                    code: "open_batch_session".into(),
+                    message: e.message,
+                });
+            }
+        };
+
+        if let Err(e) = self
+            .send_package_parts(
+                &open_batch_session_response.part_upload_requests,
+                &encrypted_parts,
+            )
+            .await
+        {
+            return Err(models::ErrorResponse {
+                code: "open_batch_session".into(),
+                message: e.message,
+            });
+        };
+
+        // close session
+        let _ = utils::pool(
+            || {
+                self.close_batch_session(
+                    &open_batch_session_response.reference_number,
+                    &access_token,
+                )
+            },
+            |result| *result,
+            self.max_attempts,
+            self.sleep_time,
+        )
+        .await;
+
+        let session_status = match self
+            .get_batch_session_status(&open_batch_session_response.reference_number, &access_token)
+            .await
+        {
+            Ok(online_session_status) => online_session_status,
+            Err(e) => return Err(e),
+        };
+
+        Ok(session_status)
     }
 }

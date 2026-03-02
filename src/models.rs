@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, FixedOffset};
 use chrono::offset::Utc;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct ErrorResponse {
@@ -254,8 +255,87 @@ pub struct SessionStatusResponse {
     pub date_updated: DateTime<FixedOffset>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FileMetadata {
-    pub file_size: usize,
+    #[serde(rename = "hashSHA")]
     pub hash_sha: String,
+
+    #[serde(rename = "fileSize")]
+    pub file_size: usize,
+}
+
+
+// Batch session
+
+#[derive(Debug)]
+pub struct BatchPartSendingInfo {
+    pub data: Vec<u8>,
+    pub metadata: FileMetadata,
+    pub ordinal_number: usize,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenBatchSessionRequest {
+    #[serde(rename = "formCode")]
+    pub form_code: FormCode,
+
+    #[serde(rename = "batchFile")]
+    pub batch_file: BatchFileInfo,
+
+    #[serde(rename = "encryption")]
+    pub encryption: EncryptionInfo,
+
+    #[serde(rename = "offlineMode")]
+    pub offline_mode: bool,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchFileInfo {
+    #[serde(rename = "fileSize")]
+    pub file_size: usize,
+
+    #[serde(rename = "fileHash")]
+    pub file_hash: String,
+
+    #[serde(rename = "fileParts")]
+    pub file_parts: Vec<BatchFilePartInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchFilePartInfo {
+    #[serde(rename = "ordinalNumber")]
+    pub ordinal_number: usize,
+
+    #[serde(rename = "fileSize")]
+    pub file_size: usize,
+
+    #[serde(rename = "fileHash")]
+    pub file_hash: String,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenBatchSessionResponse {
+    #[serde(rename = "referenceNumber")]
+    pub reference_number: String,
+
+    #[serde(rename = "partUploadRequests")]
+    pub part_upload_requests: Vec<PackagePartSignatureInitResponseType>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackagePartSignatureInitResponseType {
+    #[serde(rename = "method")]
+    pub method: String,
+
+    #[serde(rename = "ordinalNumber")]
+    pub ordinal_number: usize,
+
+    #[serde(rename = "url")]
+    pub url: String,
+
+    #[serde(rename = "headers")]
+    pub headers: HashMap<String, String>,
 }
