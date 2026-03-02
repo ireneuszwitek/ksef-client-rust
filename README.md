@@ -1,4 +1,4 @@
-# KSeF Client Rust
+# KSeF Client Rust [![Package][package-img]][package-url] [![Documentation][documentation-img]][documentation-url]
 
 [PL] komunikacja z API Krajowego Systemu e-Faktur (KSeF 2.0)
 
@@ -14,7 +14,8 @@ Przykłady użycia biblioteki znajdują się w katalogu `examples`
 - `refresh_token.rs` - odświeżenie wygasłego access_token
 - `query_invoice_metadata.rs` - pobieranie listy faktur ze stronicowaniem
 - `export_invoice.rs` - eksport faktur używany do przyrostowego pobiernia faktur
-- `get_invoice_qrcode.rs` - generowanie kodu QR faktury
+- `get_invoice_qrcode.rs` - generowanie kodu QR dla ręcznie wskazanej faktury
+- `get_invoice_qrcode_2.rs` - generowanie kodu QR dla pobranej faktury 
 - `send_invoice_online.rs` - wysłanie faktury w trybie online
 - `send_invoice_batch.rs` - wysłanie faktur w trybie wsadowym
 
@@ -28,3 +29,8 @@ ksef = "0.6"
 tokio = { version = "1.37", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"]} 
 ```
+[package-img]: https://img.shields.io/crates/v/ksef.svg
+[package-url]: https://crates.io/crates/ksef
+
+[documentation-img]: https://docs.rs/ksef/badge.svg
+[documentation-url]: https://docs.rs/ksef
