@@ -3,7 +3,7 @@ use chrono::offset::Utc;
 #[tokio::main]
 async fn main() {
 
-    let client = ksef::KsefClient::new(ksef::Environment::Prod, 2000).unwrap();
+    let client = ksef::KsefClient::new(ksef::Environment::Prod, 2000);
     let access_token = "<access_token>".to_string();
 
     let invoice_query_filters = ksef::invoice::InvoiceQueryFilters {

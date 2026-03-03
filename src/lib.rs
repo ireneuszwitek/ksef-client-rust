@@ -1,7 +1,7 @@
 use base64;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Cursor, Write};
@@ -22,7 +22,7 @@ mod qr;
 mod utils;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum Environment {
     Prod,
     Test,
@@ -61,19 +61,19 @@ pub struct CompanyInfo {
 }
 
 impl KsefClient {
-    pub fn new(environment: Environment, sleep_time: u64) -> Result<Self, url::ParseError> {
+    pub fn new(environment: Environment, sleep_time: u64) -> Self {
 
         let poll_timeout = Duration::from_secs(2 * 60); // 2 minutes
         let total_millis = poll_timeout.as_millis();
         let max_attempts = std::cmp::max(1, (total_millis / sleep_time as u128) as i32);
 
-        Ok(Self {
+        Self {
             base_url: environment.base_url().to_string(),
             qr_url: environment.qr_url().to_string(),
             sleep_time,
             max_attempts,
             public_certificates: RefCell::new(None),
-        })
+        }
     }
 
     fn join_url(&self, url: &str) -> String {
