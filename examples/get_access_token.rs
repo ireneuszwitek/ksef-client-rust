@@ -1,7 +1,7 @@
 #[tokio::main]
 async fn main() {
     
-    let client = ksef::KsefClient::new(ksef::Environment::Prod, 2000);
+    let client = ksef::Client::new(ksef::Environment::Prod, 2000);
 
     let company_info = ksef::CompanyInfo {
         ksef_token: "<ksef_token>".to_string(),
@@ -11,7 +11,7 @@ async fn main() {
     let access_tokens = match client.get_access_tokens(&company_info).await {
         Ok(access_tokens) => access_tokens,
         Err(e) => {
-            eprintln!("Error getting access_tokens: {}", e);
+            eprintln!("Error: {}; {}", e.code, e.message);
             return;
         }
     };

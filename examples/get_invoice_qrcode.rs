@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 #[tokio::main]
 async fn main() {
 
-    let client = ksef::KsefClient::new(ksef::Environment::Prod, 2000);
+    let client = ksef::Client::new(ksef::Environment::Prod, 2000);
     
     let nip = "<nip>".to_string();
     let issue_date: DateTime<Utc> = "RRRR-MM-DD HH:MM:SS +00:00".parse().unwrap();  

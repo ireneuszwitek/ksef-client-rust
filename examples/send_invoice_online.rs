@@ -1,7 +1,7 @@
 #[tokio::main]
 async fn main() {
 
-    let client = ksef::KsefClient::new(ksef::Environment::Prod, 2000);
+    let client = ksef::Client::new(ksef::Environment::Prod, 2000);
     let access_token = "<access_token>".to_string();
 
     let system_code = ksef::invoice::SystemCode::FA3;

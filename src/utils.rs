@@ -5,11 +5,13 @@ use zip::ZipArchive;
 use zip::write::SimpleFileOptions;
 use zip::{ZipWriter, CompressionMethod};
 use std::cmp::min;
+use serde::de::DeserializeOwned;
 
 const MAX_PART_SIZE_BYTES: u64 = 100 * 1000 * 1000; // 100 MB
 
 
-use crate::{cryptography, models};
+use crate::error::ToErrorResponse;
+use crate::{cryptography, error, models};
 
 
 pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
@@ -35,7 +37,7 @@ pub(crate) fn unzip<R: Read + Seek>(zip_stream: R) -> HashMap<String, String> {
 pub(crate) async fn pool<T, FAction, FutA, FCond>(action: FAction, condition: FCond, max_attempts: i32, delay_ms: u64) -> Result<T, &'static str>
 where
     FAction: Fn() -> FutA,
-    FutA: Future<Output = Result<T, models::ErrorResponse>>,
+    FutA: Future<Output = Result<T, error::ErrorResponse>>,
     FCond: Fn(&T) -> bool,
 {
     for _ in 1..=max_attempts {
@@ -57,35 +59,38 @@ where
 }
 
 
-pub(crate) async fn handle_response<T>(
+pub(crate) async fn handle_response<T, R>(
     response: Result<reqwest::Response, reqwest::Error>,
-) -> Result<T, models::ErrorResponse>
+) -> Result<T, error::ErrorResponse>
 where
     T: serde::de::DeserializeOwned,
+    R: DeserializeOwned + ToErrorResponse,
 {
-    let response = response.map_err(|_| models::ErrorResponse {
-        code: "request_error".into(),
-        message: "Request error".into(),
+    let response = response.map_err(|_| error::ErrorResponse {
+        code: "network_error".into(),
+        message: "Network error".into(),
     })?;
 
     let status = response.status();
 
     if !status.is_success() {
-        let err = response
-            .json::<models::ErrorResponse>()
-            .await
-            .unwrap_or_else(|_| models::ErrorResponse {
-                code: status.as_str().to_string(),
-                message: format!("Server returned HTTP {}", status),
-            });
-
-        return Err(err);
+        let err = match response
+                    .json::<R>().await {
+                    Ok(err) => err,
+                    Err(_) => {
+                        return Err(error::ErrorResponse {
+                        code: status.as_str().to_string(),
+                        message: format!("Server returned HTTP {}", status),
+                        })
+                    }
+                };
+        return Err(err.to_error_response("ksef_api_error".into()));
     }
 
     response
         .json::<T>()
         .await
-        .map_err(|_| models::ErrorResponse {
+        .map_err(|_| error::ErrorResponse {
             code: "invalid_response".into(),
             message: "Failed to parse success response".into(),
         })

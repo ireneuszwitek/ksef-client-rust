@@ -3,12 +3,6 @@ use chrono::{DateTime, FixedOffset};
 use chrono::offset::Utc;
 use std::collections::HashMap;
 
-#[derive(Debug, Deserialize)]
-pub struct ErrorResponse {
-    pub code: String,
-    pub message: String,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EncryptionInfo {
     #[serde(rename = "EncryptedSymmetricKey")]

@@ -13,7 +13,7 @@ use rsa::{
 use sha2::{Sha256, Digest};
 use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
 
-use crate::{KsefClient, certificates, models};
+use crate::{Client, certificates, models};
 
 pub(crate) fn export_public_key_to_pem(
     rsa: &RsaPublicKey,
@@ -76,7 +76,7 @@ pub fn decrypt_bytes_with_aes256(content: &[u8], key: &[u8], iv: &[u8]) -> Resul
 }
 
 pub(crate) async fn get_encryption_data(
-    client: &KsefClient,
+    client: &Client,
 ) -> Result<models::EncryptionData, &str> {
     let key = generate_random_256_bits_key();
     let iv = generate_random_16_bytes_iv();

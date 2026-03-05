@@ -1,4 +1,4 @@
-use crate::{KsefClient, models, certificates};
+use crate::{Client, models, certificates};
 
 pub(crate) async fn get_public_certificates(
     base_url: &String,
@@ -16,7 +16,7 @@ pub(crate) async fn get_public_certificates(
 }
 
 pub(crate) async fn public_certificate(
-        client: &KsefClient,
+        client: &Client,
         certificate_usage: &models::PublicKeyCertificateUsage,
     ) -> Result<String, &'static str> {
         // Checking if public certificates have already been downloaded
