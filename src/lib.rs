@@ -1,10 +1,11 @@
 pub use crate::client::*;
 
-mod client;
-mod error;
-pub mod models;
+mod auth;
 mod certificates;
+mod client;
+mod common;
 mod cryptography;
+mod error;
 pub mod invoice;
 mod qr;
-mod utils;
+mod session;

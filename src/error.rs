@@ -24,11 +24,7 @@ pub struct ApiErrorResponse {
 
 impl ApiErrorResponse {
     pub(crate) fn build_error_message_from_details(&self) -> String {
-        let details_list = match self
-            .exception
-            .exception_detail_list
-            .as_slice()
-        {
+        let details_list = match self.exception.exception_detail_list.as_slice() {
             [] => return String::new(),
             list => list,
         };
@@ -42,7 +38,10 @@ impl ApiErrorResponse {
                 };
 
                 if details_text.is_empty() {
-                    format!("{}: {}", detail.exception_code, detail.exception_description)
+                    format!(
+                        "{}: {}",
+                        detail.exception_code, detail.exception_description
+                    )
                 } else {
                     format!(
                         "{}: {} - {}",
@@ -58,9 +57,9 @@ impl ApiErrorResponse {
 
 impl ToErrorResponse for ApiErrorResponse {
     fn to_error_response(&self, code: String) -> ErrorResponse {
-        ErrorResponse { 
-            code: code, 
-            message: self.build_error_message_from_details(), 
+        ErrorResponse {
+            code: code,
+            message: self.build_error_message_from_details(),
         }
     }
 }

@@ -1,8 +1,6 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, offset::Utc};
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::collections::HashMap;
-use crate::models;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum SystemCode {
@@ -119,21 +117,6 @@ impl fmt::Display for SortOrder {
 /////////////////////////////////
 ///  Invoice response
 /////////////////////////////////
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PagedInvoiceResponse {
-    #[serde(rename = "hasMore")]
-    pub has_more: bool,
-
-    #[serde(rename = "isTruncated")]
-    pub is_truncated: bool,
-
-    #[serde(rename = "invoices")]
-    pub invoices: Vec<InvoiceSummary>,
-
-    #[serde(rename = "permanentStorageHwmDate")]
-    pub permanent_storage_hwm_date: Option<DateTime<Utc>>,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InvoiceSummary {
@@ -333,137 +316,4 @@ pub struct AuthorizedSubject {
 
     #[serde(rename = "role")]
     pub role: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ExportInvoiceRequest {
-    /// Informacje o szyfrowaniu paczki (RSA OAEP-SHA256, Base64).
-    #[serde(rename = "Encryption")]
-    pub encryption: models::EncryptionInfo,
-
-    /// Filtry wyboru faktur do eksportu.
-    #[serde(rename = "Filters")]
-    pub filters: InvoiceQueryFilters,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OperationResponse {
-    #[serde(rename = "referenceNumber")]
-    pub reference_number: String,
-}
-
-// Export status response
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct ExportInvoiceStatusResponse {
-    #[serde(rename = "status")]
-    pub(crate) status: models::OperationStatusInfo,
-
-    #[serde(rename = "completedDate")]
-    pub(crate) completed_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "packageExpirationDate")]
-    pub(crate) package_expiration_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "package")]
-    pub(crate) package: ExportInvoicePackage,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExportInvoicePackage {
-    #[serde(rename = "invoiceCount")]
-    pub invoice_count: i32,
-
-    #[serde(rename = "size")]
-    pub size: i64,
-
-    #[serde(rename = "parts")]
-    pub parts: Vec<ExportInvoicePackagePart>,
-
-    #[serde(rename = "isTruncated")]
-    pub is_truncated: bool,
-
-    #[serde(rename = "lastIssueDate")]
-    pub last_issue_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "lastInvoicingDate")]
-    pub last_invoicing_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "lastPermanentStorageDate")]
-    pub last_permanent_storage_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "permanentStorageHwmDate")]
-    pub permanent_storage_hwm_date: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExportInvoicePackagePart {
-    #[serde(rename = "ordinalNumber")]
-    pub ordinal_number: i32,
-
-    #[serde(rename = "partName")]
-    pub part_name: String,
-
-    #[serde(rename = "method")]
-    pub method: String,
-
-    #[serde(rename = "url")]
-    pub url: String,
-
-    #[serde(rename = "partSize")]
-    pub part_size: i64,
-
-    #[serde(rename = "partHash")]
-    pub part_hash: String,
-
-    #[serde(rename = "encryptedPartSize")]
-    pub encrypted_part_size: i64,
-
-    #[serde(rename = "encryptedPartHash")]
-    pub encrypted_part_hash: String,
-
-    #[serde(rename = "expirationDate")]
-    pub expiration_date: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InvoicePackageMetadata {
-    pub invoices: Option<Vec<InvoiceSummary>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ExportInvoiceResult {
-    pub metadata_summaries: Vec<InvoiceSummary>,
-    pub xml_files: HashMap<String, String>,
-    pub is_truncated: bool,
-    pub last_permanent_storage_date: Option<DateTime<Utc>>,
-    pub permanent_storage_hwm_date: Option<DateTime<Utc>>,
-}
-
-/////////////////////////////////
-///  Send invoice 
-/////////////////////////////////
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SendInvoiceRequest {
-    #[serde(rename = "invoiceHash")]
-    pub invoice_hash: String,
-
-    #[serde(rename = "invoiceSize")]
-    pub invoice_size: i64,
-
-    #[serde(rename = "encryptedInvoiceHash")]
-    pub encrypted_invoice_hash: String,
-
-    #[serde(rename = "encryptedInvoiceSize")]
-    pub encrypted_invoice_size: i64,
-
-    #[serde(rename = "encryptedInvoiceContent")]
-    pub encrypted_invoice_content: String,
-
-    #[serde(rename = "offlineMode")]
-    pub offline_mode: bool,
-
-    #[serde(rename = "hashOfCorrectedInvoice")]
-    pub hash_of_corrected_invoice: Option<String>,
 }

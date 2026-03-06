@@ -25,7 +25,7 @@ Dodaj do `Cargo.toml`:
 
 ```toml
 [dependencies]
-ksef = "0.6"
+ksef = "0.7"
 tokio = { version = "1.37", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"]} 
 ```

@@ -7,13 +7,45 @@ use pem_rfc7468::LineEnding;
 use rand::{RngCore, rngs::OsRng};
 use rsa::{
     RsaPublicKey,
+    oaep::Oaep,
     pkcs8::{DecodePublicKey, EncodePublicKey},
-    oaep::Oaep
 };
-use sha2::{Sha256, Digest};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use x509_parser::{parse_x509_certificate, pem::parse_x509_pem};
 
-use crate::{Client, certificates, models};
+use crate::{certificates, common};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EncryptionInfo {
+    #[serde(rename = "EncryptedSymmetricKey")]
+    pub encrypted_symmetric_key: String,
+
+    #[serde(rename = "InitializationVector")]
+    pub initialization_vector: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EncryptionData {
+    #[serde(rename = "CipherKey")]
+    pub cipher_key: Vec<u8>,
+
+    #[serde(rename = "CipherIv")]
+    pub cipher_iv: Vec<u8>,
+
+    #[serde(rename = "EncryptionInfo")]
+    pub encryption_info: EncryptionInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileMetadata {
+    #[serde(rename = "hashSHA")]
+    pub hash_sha: String,
+
+    #[serde(rename = "fileSize")]
+    pub file_size: usize,
+}
 
 pub(crate) fn export_public_key_to_pem(
     rsa: &RsaPublicKey,
@@ -76,14 +108,16 @@ pub fn decrypt_bytes_with_aes256(content: &[u8], key: &[u8], iv: &[u8]) -> Resul
 }
 
 pub(crate) async fn get_encryption_data(
-    client: &Client,
-) -> Result<models::EncryptionData, &str> {
+    base_url: &common::Url,
+    public_certificates: &RefCell<Option<Vec<certificates::PemCertificateInfo>>>,
+) -> Result<EncryptionData, &'static str> {
     let key = generate_random_256_bits_key();
     let iv = generate_random_16_bytes_iv();
 
     let symetric_cert = match certificates::public_certificate(
-        &client,
-        &models::PublicKeyCertificateUsage::SymmetricKeyEncryption,
+        &base_url,
+        &public_certificates,
+        &certificates::PublicKeyCertificateUsage::SymmetricKeyEncryption,
     )
     .await
     {
@@ -96,12 +130,12 @@ pub(crate) async fn get_encryption_data(
     let encrypted_key: Vec<u8> =
         encrypt_ksef_token_with_rsa_using_public_key(&symetric_cert, &key).unwrap();
 
-    let encryption_info = models::EncryptionInfo {
+    let encryption_info = EncryptionInfo {
         encrypted_symmetric_key: STANDARD.encode(&encrypted_key),
         initialization_vector: STANDARD.encode(&iv),
     };
 
-    let encrypted_data = models::EncryptionData {
+    let encrypted_data = EncryptionData {
         cipher_key: key,
         cipher_iv: iv,
         encryption_info,
@@ -110,12 +144,12 @@ pub(crate) async fn get_encryption_data(
     Ok(encrypted_data)
 }
 
-pub(crate) fn get_metadata(file: &[u8]) -> models::FileMetadata {
+pub(crate) fn get_metadata(file: &[u8]) -> FileMetadata {
     let mut hasher = Sha256::new();
     hasher.update(file);
     let hash = hasher.finalize();
 
-    models::FileMetadata {
+    FileMetadata {
         file_size: file.len(),
         hash_sha: STANDARD.encode(hash),
     }

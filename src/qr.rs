@@ -1,7 +1,7 @@
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use chrono::{DateTime, Utc};
-use qrcode::QrCode;
 use image::{ImageBuffer, Luma};
+use qrcode::QrCode;
 use std::io::Cursor;
 
 pub(crate) fn decode_base64_or_base64url(input: &str) -> Result<Vec<u8>, &'static str> {
@@ -26,22 +26,18 @@ pub(crate) fn decode_base64_or_base64url(input: &str) -> Result<Vec<u8>, &'stati
         .map_err(|_| "Invalid Base64/Base64Url")
 }
 
-
 pub(crate) fn build_invoice_verification_url(
     base_url: &String,
     nip: &String,
-    issue_date:&DateTime<Utc>,
+    issue_date: &DateTime<Utc>,
     invoice_hash: &String,
 ) -> Result<String, &'static str> {
-
-    let base_url = base_url
-            .trim_end_matches('/')
-            .to_string();
+    let base_url = base_url.trim_end_matches('/').to_string();
 
     let date = issue_date.format("%d-%m-%Y").to_string();
 
-    let decoded = decode_base64_or_base64url(invoice_hash)
-        .map_err(|_| "Invalid Base64/Base64Url")?;
+    let decoded =
+        decode_base64_or_base64url(invoice_hash).map_err(|_| "Invalid Base64/Base64Url")?;
 
     let encoded = general_purpose::URL_SAFE_NO_PAD.encode(decoded);
 
@@ -52,9 +48,8 @@ pub(crate) fn generate(
     data: &String,
     qr_resolution_px: Option<u32>,
 ) -> Result<Vec<u8>, &'static str> {
-
     let qr_resolution_px = match qr_resolution_px {
-        Some(qr_resolution_px) =>qr_resolution_px,
+        Some(qr_resolution_px) => qr_resolution_px,
         None => 200,
     };
 
