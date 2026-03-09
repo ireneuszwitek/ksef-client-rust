@@ -8,5 +8,5 @@ mod cryptography;
 mod error;
 pub mod invoice;
 mod qr;
-mod session;
+pub mod session;
 mod upo;

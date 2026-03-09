@@ -43,12 +43,6 @@ pub struct Client {
     pub(crate) public_certificates: RefCell<Option<Vec<certificates::PemCertificateInfo>>>,
 }
 
-#[deprecated(
-    since = "0.6.3",
-    note = "KsefClient has been replaced by Client. Use Client instead of KsefClient."
-)]
-pub use Client as KsefClient;
-
 impl Client {
     pub fn new(environment: Environment, sleep_time: u64) -> Self {
         let poll_timeout = Duration::from_secs(2 * 60); // 2 minutes
@@ -249,8 +243,8 @@ impl Client {
         reference_number: &String,
         access_token: &String,
         page_size: i32,
-    ) -> Result<session::status::SessionInvoicesResponse, error::ErrorResponse> {
-        session::status::get_session_invoice(
+    ) -> Result<session::session_invoice::SessionInvoicesResponse, error::ErrorResponse> {
+        session::session_invoice::get_session_invoice(
             &self.base_url,
             &reference_number,
             &access_token,
@@ -277,4 +271,15 @@ impl Client {
     pub async fn get_upo(&self, url: &String) -> Result<String, error::ErrorResponse> {
         upo::get_upo(&url).await
     }
+
+
+    pub async fn get_sessions(
+        &self,
+        session_type: session::SessionType,
+        access_token: &String,
+        page_size: i32,
+        session_filter: &Option<session::SessionsFilter>,
+    ) -> Result<session::status::SessionsListResponse, error::ErrorResponse> {
+        session::status::get_sessions(&self.base_url, session_type, &access_token, page_size, session_filter).await
+    }   
 }

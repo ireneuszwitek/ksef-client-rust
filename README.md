@@ -12,12 +12,14 @@ Przykłady użycia biblioteki znajdują się w katalogu `examples`
 
 - `get_access_token.rs` - autentykacja i pobranie access_token
 - `refresh_token.rs` - odświeżenie wygasłego access_token
-- `query_invoice_metadata.rs` - pobieranie listy faktur ze stronicowaniem
+- `query_invoice_metadata.rs` - pobranie listy faktur ze stronicowaniem
 - `export_invoice.rs` - eksport faktur używany do przyrostowego pobiernia faktur
 - `get_invoice_qrcode.rs` - generowanie kodu QR dla ręcznie wskazanej faktury
 - `get_invoice_qrcode_2.rs` - generowanie kodu QR dla pobranej faktury 
 - `send_invoice_online.rs` - wysłanie faktury w trybie online
 - `send_invoice_batch.rs` - wysłanie faktur w trybie wsadowym wraz z pobraniem UPO zbiorczego dla sesji i dla pierwszej wysłanej faktury
+- `get_sessions.rs` - pobranie listy sesji
+
 
 ## 🔧 Instalacja
 

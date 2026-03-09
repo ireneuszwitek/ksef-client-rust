@@ -1,8 +1,9 @@
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use urlencoding::encode;
+use std::fmt;
 
-use crate::{common, error, invoice};
+use crate::{common, error};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpoResponse {
@@ -50,55 +51,173 @@ pub struct SessionStatusResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SessionInvoice {
-    #[serde(rename = "ordinalNumber")]
-    pub ordinal_number: i32,
-
-    #[serde(rename = "invoiceNumber")]
-    pub invoice_number: Option<String>,
-
-    #[serde(rename = "ksefNumber")]
-    pub ksef_number: Option<String>,
-
-    #[serde(rename = "referenceNumber")]
-    pub reference_number: Option<String>,
-
-    #[serde(rename = "invoiceHash")]
-    pub invoice_hash: Option<String>,
-
-    #[serde(rename = "invoiceFileName")]
-    pub invoice_file_name: Option<String>,
-
-    #[serde(rename = "acquisitionDate")]
-    pub acquisition_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "invoicingDate")]
-    pub invoicing_date: DateTime<Utc>,
-
-    #[serde(rename = "permanentStorageDate")]
-    pub permanent_storage_date: Option<DateTime<Utc>>,
-
-    #[serde(rename = "upoDownloadUrl")]
-    pub upo_download_url: Option<String>,
-
-    // #[serde(rename = "status")]
-    pub status: invoice::InvoiceStatusInfo,
-
-    #[serde(rename = "invoicingMode")]
-    pub invoicing_mode: Option<invoice::InvoicingMode>,
-
-    #[serde(rename = "upoDownloadUrlExpirationDate")]
-    pub upo_download_url_expiration_date: Option<DateTime<Utc>>,
+pub enum SessionType {
+    #[serde(rename = "online")]
+    Online,
+    #[serde(rename = "batch")]
+    Batch,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SessionInvoicesResponse {
+
+impl fmt::Display for SessionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            SessionType::Online => "Online",
+            SessionType::Batch => "Batch",
+        };
+        write!(f, "{}", text)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SessionStatus {
+    #[serde(rename = "succeeded")]
+    Succeeded,
+
+    #[serde(rename = "inProgress")]
+    InProgress,
+
+    #[serde(rename = "failed")]
+    Failed,
+
+    #[serde(rename = "cancelled")]
+    Cancelled,
+}
+
+impl fmt::Display for SessionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            SessionStatus::Succeeded => "succeeded",
+            SessionStatus::InProgress => "inProgress",
+            SessionStatus::Failed => "failed",
+            SessionStatus::Cancelled => "cancelled",
+        };
+        write!(f, "{}", text)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SessionsFilter {
+    /// Session reference number
+    #[serde(rename = "ReferenceNumber")]
+    pub reference_number: Option<String>,
+
+    /// Session creation date (from)
+    #[serde(rename = "DateCreatedFrom")]
+    pub date_created_from: Option<DateTime<Utc>>,
+
+    /// Session creation date (to)
+    #[serde(rename = "DateCreatedTo")]
+    pub date_created_to: Option<DateTime<Utc>>,
+
+    /// Session closing date (from)
+    #[serde(rename = "DateClosedFrom")]
+    pub date_closed_from: Option<DateTime<Utc>>,
+
+    /// Session closing date (to)
+    #[serde(rename = "DateClosedTo")]
+    pub date_closed_to: Option<DateTime<Utc>>,
+
+    /// Date of last activity (from)
+    #[serde(rename = "DateModifiedFrom")]
+    pub date_modified_from: Option<DateTime<Utc>>,
+
+    /// Date of last activity (to)
+    #[serde(rename = "DateModifiedTo")]
+    pub date_modified_to: Option<DateTime<Utc>>,
+
+    /// Session statuses
+    #[serde(rename = "Statuses")]
+    pub statuses: Option<Vec<SessionStatus>>,
+}
+
+impl SessionsFilter {
+    pub fn get_query_url(&self) -> String {
+        let mut out = String::new();
+
+        fn add(out: &mut String, name: &str, value: &str) {
+            if !value.is_empty() {
+                out.push('&');
+                out.push_str(name);
+                out.push('=');
+                out.push_str(&encode(value));
+            }
+        }
+
+        // referenceNumber
+        if let Some(v) = &self.reference_number {
+            add(&mut out, "referenceNumber", v);
+        }
+
+        // dates
+        if let Some(v) = self.date_created_from {
+            add(&mut out, "dateCreatedFrom", &v.to_rfc3339());
+        }
+        if let Some(v) = self.date_created_to {
+            add(&mut out, "dateCreatedTo", &v.to_rfc3339());
+        }
+        if let Some(v) = self.date_closed_from {
+            add(&mut out, "dateClosedFrom", &v.to_rfc3339());
+        }
+        if let Some(v) = self.date_closed_to {
+            add(&mut out, "dateClosedTo", &v.to_rfc3339());
+        }
+        if let Some(v) = self.date_modified_from {
+            add(&mut out, "dateModifiedFrom", &v.to_rfc3339());
+        }
+        if let Some(v) = self.date_modified_to {
+            add(&mut out, "dateModifiedTo", &v.to_rfc3339());
+        }
+        // statuses
+        if let Some(list) = &self.statuses {
+            for status in list {
+                add(&mut out, "statuses", &status.to_string());
+            }
+        }
+
+        out
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionsListResponse {
     #[serde(rename = "continuationToken")]
     pub continuation_token: Option<String>,
 
-    #[serde(rename = "invoices")]
-    pub invoices: Vec<SessionInvoice>,
+    #[serde(rename = "sessions")]
+    pub sessions: Vec<Session>,
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Session {
+    #[serde(rename = "referenceNumber")]
+    pub reference_number: String,
+
+    #[serde(rename = "status")]
+    pub status: common::OperationStatusInfo,
+
+    #[serde(rename = "dateCreated")]
+    pub date_created: DateTime<Utc>,
+
+    #[serde(rename = "dateUpdated")]
+    pub date_updated: DateTime<Utc>,
+
+    #[serde(rename = "validUntil")]
+    pub valid_until: DateTime<Utc>,
+
+    #[serde(rename = "totalInvoiceCount")]
+    pub total_invoice_count: i32,
+
+    #[serde(rename = "successfulInvoiceCount")]
+    pub successful_invoice_count: i32,
+
+    #[serde(rename = "failedInvoiceCount")]
+    pub failed_invoice_count: i32,
+}
+
+
 
 pub(crate) async fn get_session_status(
     base_url: &common::Url,
@@ -151,16 +270,22 @@ pub(crate) async fn try_get_session_status(
     }
 }
 
-pub(crate) async fn get_session_invoice(
+
+pub(crate) async fn get_sessions(
     base_url: &common::Url,
-    reference_number: &String,
+    session_type: SessionType,
     access_token: &String,
     page_size: i32,
-) -> Result<SessionInvoicesResponse, error::ErrorResponse> {
-    let mut url = format!("/v2/sessions/{}/invoices", encode(reference_number));
+    session_filter: &Option<SessionsFilter>,
+) -> Result<SessionsListResponse, error::ErrorResponse> {
+    let mut url = format!("/v2/sessions?sessionType={}", session_type);
 
     if page_size > 0 {
-        url = format!("{}?pageSize={}", url, page_size);
+        url = format!("{}&pageSize={}", url, page_size);
+    }    
+
+    if let Some(filter) = session_filter{
+        url = format!("{}{}", url, filter.get_query_url());
     }
 
     let reqwest_client = reqwest::Client::new();
@@ -170,9 +295,9 @@ pub(crate) async fn get_session_invoice(
         .send()
         .await;
 
-    common::response::handle_response::<SessionInvoicesResponse, error::ErrorResponse>(response)
-        .await
+    common::response::handle_response::<SessionsListResponse, error::ErrorResponse>(response).await
 }
+
 
 pub(crate) async fn get_session_upo(
     base_url: &common::Url,
