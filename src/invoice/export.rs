@@ -182,10 +182,7 @@ pub async fn export_invoice(
     {
         Ok(export_status) => export_status,
         Err(e) => {
-            return Err(error::ErrorResponse {
-                code: "export_invoice_status_error".into(),
-                message: e.into(),
-            });
+            return Err(e);
         }
     };
 

@@ -205,22 +205,17 @@ async fn get_batch_session_status(
                 base_url,
                 &reference_number,
                 &access_token,
-                max_attempts,
-                sleep_time,
             )
         },
-        |result| result.status.code == 200,
+        |result| result.status.code == 200 || result.status.code == 445,
         max_attempts,
         sleep_time,
     )
     .await
     {
         Ok(session_status) => session_status,
-        Err(_) => {
-            return Err(error::ErrorResponse {
-                code: "get_session_status_error".into(),
-                message: "get_session_status_error".into(), //e.into(),
-            });
+        Err(e) => {
+            return Err(e);
         }
     };
 
@@ -236,7 +231,7 @@ pub async fn send_invoice_batch(
     part_count: usize,
     max_attempts: i32,
     sleep_time: u64,
-) -> Result<session::status::SessionStatusResponse, error::ErrorResponse> {
+) -> Result<(String, session::status::SessionStatusResponse), error::ErrorResponse> {
     let form_code = invoice::FormCode {
         system_code: system_code.system_code().into(),
         schema_version: system_code.schema_version().into(),
@@ -316,7 +311,7 @@ pub async fn send_invoice_batch(
         &base_url,
         &open_batch_session_response.reference_number,
         &access_token,
-        max_attempts,
+        10,
         sleep_time,
     )
     .await
@@ -325,7 +320,7 @@ pub async fn send_invoice_batch(
         Err(e) => return Err(e),
     };
 
-    Ok(session_status)
+    Ok((open_batch_session_response.reference_number, session_status))
 }
 
 pub fn encrypt_and_split(

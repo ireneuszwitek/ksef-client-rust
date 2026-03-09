@@ -9,3 +9,4 @@ mod error;
 pub mod invoice;
 mod qr;
 mod session;
+mod upo;

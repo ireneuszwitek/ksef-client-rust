@@ -6,7 +6,7 @@ pub(crate) async fn pool<T, FAction, FutA, FCond>(
     condition: FCond,
     max_attempts: i32,
     sleep_time: u64,
-) -> Result<T, &'static str>
+) -> Result<T, error::ErrorResponse>
 where
     FAction: Fn() -> FutA,
     FutA: Future<Output = Result<T, error::ErrorResponse>>,
@@ -19,13 +19,16 @@ where
                     return Ok(result);
                 }
             }
-            Err(_) => {
-                return Err("get_status_error");
+            Err(e) => {
+                return Err(e);
             }
         }
 
         sleep(Duration::from_millis(sleep_time)).await;
     }
 
-    Err("Maximum number of attempts exceeded")
+    Err(error::ErrorResponse {
+                    code: "max_attempts_exceeded".into(),
+                    message: "Maximum number of attempts exceeded".into(),
+    })
 }

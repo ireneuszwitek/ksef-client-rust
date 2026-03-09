@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::time::Duration;
 
-use crate::{auth, certificates, common, cryptography, error, invoice, qr, session};
+use crate::{auth, certificates, common, cryptography, error, invoice, qr, session, upo};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum Environment {
@@ -220,7 +220,7 @@ impl Client {
         system_code: &invoice::SystemCode,
         list: &Vec<(String, String)>,
         part_count: usize,
-    ) -> Result<session::status::SessionStatusResponse, error::ErrorResponse> {
+    ) -> Result<(String, session::status::SessionStatusResponse), error::ErrorResponse> {
         let encryption = match self.get_encryption_data().await {
             Ok(encryption) => encryption,
             Err(e) => {
@@ -242,5 +242,39 @@ impl Client {
             self.sleep_time,
         )
         .await
+    }
+
+    pub async fn get_session_invoice(
+        &self,
+        reference_number: &String,
+        access_token: &String,
+        page_size: i32,
+    ) -> Result<session::status::SessionInvoicesResponse, error::ErrorResponse> {
+        session::status::get_session_invoice(
+            &self.base_url,
+            &reference_number,
+            &access_token,
+            page_size,
+        )
+        .await
+    }
+
+    pub async fn get_session_upo(
+        &self,
+        session_reference_number: &String,
+        upo_reference_number: &String,
+        access_token: &String,
+    ) -> Result<String, error::ErrorResponse> {
+        session::status::get_session_upo(
+            &self.base_url,
+            &session_reference_number,
+            &upo_reference_number,
+            &access_token,
+        )
+        .await
+    }
+
+    pub async fn get_upo(&self, url: &String) -> Result<String, error::ErrorResponse> {
+        upo::get_upo(&url).await
     }
 }

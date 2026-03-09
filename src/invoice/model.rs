@@ -1,5 +1,6 @@
 use chrono::{DateTime, offset::Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -230,6 +231,22 @@ pub enum InvoicingMode {
     #[serde(rename = "Offline")]
     Offline,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InvoiceStatusInfo {
+    #[serde(rename = "code")]
+    pub code: i32,
+
+    #[serde(rename = "description")]
+    pub description: String,
+
+    #[serde(rename = "details")]
+    pub details: Option<Vec<String>>,
+
+    #[serde(rename = "extensions")]
+    pub extensions: Option<HashMap<String, String>>,
+}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum InvoiceType {

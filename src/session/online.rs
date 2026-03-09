@@ -167,7 +167,7 @@ pub async fn get_session_status(
 ) -> Result<session::status::SessionStatusResponse, error::ErrorResponse> {
     let session_status = match common::pooling::pool(
         || {
-            session::status::get_session_status(
+            session::status::try_get_session_status(
                 &base_url,
                 &reference_number,
                 &access_token,
@@ -182,11 +182,8 @@ pub async fn get_session_status(
     .await
     {
         Ok(session_status) => session_status,
-        Err(_) => {
-            return Err(error::ErrorResponse {
-                code: "get_session_status_error".into(),
-                message: "get_session_status_error".into(), //e.into(),
-            });
+        Err(e) => {
+            return Err(e);
         }
     };
 

@@ -17,7 +17,7 @@ Przykłady użycia biblioteki znajdują się w katalogu `examples`
 - `get_invoice_qrcode.rs` - generowanie kodu QR dla ręcznie wskazanej faktury
 - `get_invoice_qrcode_2.rs` - generowanie kodu QR dla pobranej faktury 
 - `send_invoice_online.rs` - wysłanie faktury w trybie online
-- `send_invoice_batch.rs` - wysłanie faktur w trybie wsadowym
+- `send_invoice_batch.rs` - wysłanie faktur w trybie wsadowym wraz z pobraniem UPO zbiorczego dla sesji i dla pierwszej wysłanej faktury
 
 ## 🔧 Instalacja
 
