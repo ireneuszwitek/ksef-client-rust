@@ -5,7 +5,7 @@ mod certificates;
 mod client;
 mod common;
 mod cryptography;
-mod error;
+pub mod error;
 pub mod invoice;
 mod qr;
 pub mod session;

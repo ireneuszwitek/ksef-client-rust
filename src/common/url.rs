@@ -16,3 +16,37 @@ impl Url {
         )
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn join_simple() {
+        let url = Url { base: "http://example.com".into() };
+        let result = url.join("path");
+        assert_eq!(result, "http://example.com/path");
+    }
+
+    #[test]
+    fn join_base_with_trailing_slash() {
+        let url = Url { base: "http://example.com/".into() };
+        let result = url.join("path");
+        assert_eq!(result, "http://example.com/path");
+    }
+
+    #[test]
+    fn join_path_with_leading_slash() {
+        let url = Url { base: "http://example.com".into() };
+        let result = url.join("/path");
+        assert_eq!(result, "http://example.com/path");
+    }
+
+    #[test]
+    fn join_both_have_slashes() {
+        let url = Url { base: "http://example.com/".into() };
+        let result = url.join("/path");
+        assert_eq!(result, "http://example.com/path");
+    }    
+}

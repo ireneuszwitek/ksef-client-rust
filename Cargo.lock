@@ -1063,7 +1063,7 @@ dependencies = [
 
 [[package]]
 name = "ksef"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "aes",
  "base64 0.21.7",
@@ -1072,6 +1072,7 @@ dependencies = [
  "cbc",
  "chrono",
  "cipher 0.4.4",
+ "http",
  "image 0.24.9",
  "pem-rfc7468 1.0.0",
  "qrcode",

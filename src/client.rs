@@ -66,6 +66,9 @@ impl Client {
         &self,
         company_info: &CompanyInfo,
     ) -> Result<auth::token::TokenPair, error::ErrorResponse> {
+        common::require_not_empty(&company_info.ksef_token, "company_info.ksef_token")?;
+        common::require_not_empty(&company_info.nip, "company_info.nip")?;
+
         auth::token::get_access_tokens(
             &self.base_url,
             &self.public_certificates,
@@ -81,6 +84,8 @@ impl Client {
         &self,
         refresh_token: &String,
     ) -> Result<auth::token::TokenInfo, error::ErrorResponse> {
+        common::require_not_empty(&refresh_token, "refresh_token")?;
+
         auth::token::refresh_access_token(&self.base_url, &refresh_token).await
     }
 
@@ -92,6 +97,8 @@ impl Client {
         page_size: i32,
         sort_order: invoice::SortOrder,
     ) -> Result<invoice::query::PagedInvoiceResponse, error::ErrorResponse> {
+        common::require_not_empty(&access_token, "access_token")?;
+
         invoice::query::query_metadata(
             &self.base_url,
             &request,
@@ -107,6 +114,8 @@ impl Client {
         filters: &invoice::InvoiceQueryFilters,
         access_token: &String,
     ) -> Result<invoice::export::ExportInvoiceResult, error::ErrorResponse> {
+        common::require_not_empty(&access_token, "access_token")?;
+
         let encryption = match self.get_encryption_data().await {
             Ok(encryption) => encryption,
             Err(e) => {
@@ -135,6 +144,9 @@ impl Client {
         invoice_hash: &String,
         resolution_px: Option<u32>,
     ) -> Result<Vec<u8>, error::ErrorResponse> {
+        common::require_not_empty(&nip, "nip")?;
+        common::require_not_empty(&invoice_hash, "invoice_hash")?;
+
         let invoice_for_online_url =
             qr::build_invoice_verification_url(&self.qr_url, nip, &issue_date, &invoice_hash)
                 .map_err(|_| error::ErrorResponse {
@@ -158,6 +170,8 @@ impl Client {
         access_token: &String,
         system_code: &invoice::SystemCode,
     ) -> Result<session::online::OpenOnlineSessionResponse, error::ErrorResponse> {
+        common::require_not_empty(&access_token, "access_token")?;
+
         session::online::open_online_session(
             &self.base_url,
             &encryption,
@@ -172,6 +186,9 @@ impl Client {
         reference_number: &String,
         access_token: &String,
     ) -> Result<(), error::ErrorResponse> {
+        common::require_not_empty(&reference_number, "reference_number")?;
+        common::require_not_empty(&access_token, "access_token")?;
+
         session::online::close_online_session(&self.base_url, &reference_number, &access_token)
             .await
     }
@@ -183,6 +200,10 @@ impl Client {
         encryption: &cryptography::EncryptionData,
         xml: &String,
     ) -> Result<common::OperationResponse, error::ErrorResponse> {
+        common::require_not_empty(&reference_number, "reference_number")?;
+        common::require_not_empty(&access_token, "access_token")?;
+        common::require_not_empty(&xml, "xml")?;
+
         session::online::send_invoice(
             &self.base_url,
             &reference_number,
@@ -198,6 +219,9 @@ impl Client {
         reference_number: &String,
         access_token: &String,
     ) -> Result<session::status::SessionStatusResponse, error::ErrorResponse> {
+        common::require_not_empty(&reference_number, "reference_number")?;
+        common::require_not_empty(&access_token, "access_token")?;
+
         session::online::get_session_status(
             &self.base_url,
             &reference_number,
@@ -215,6 +239,9 @@ impl Client {
         list: &Vec<(String, String)>,
         part_count: usize,
     ) -> Result<(String, session::status::SessionStatusResponse), error::ErrorResponse> {
+        common::require_not_empty(&access_token, "access_token")?;
+        common::vec_require_not_empty(&list, "list")?;
+
         let encryption = match self.get_encryption_data().await {
             Ok(encryption) => encryption,
             Err(e) => {
@@ -244,6 +271,9 @@ impl Client {
         access_token: &String,
         page_size: i32,
     ) -> Result<session::session_invoice::SessionInvoicesResponse, error::ErrorResponse> {
+        common::require_not_empty(&reference_number, "reference_number")?;
+        common::require_not_empty(&access_token, "access_token")?;
+
         session::session_invoice::get_session_invoice(
             &self.base_url,
             &reference_number,
@@ -259,6 +289,10 @@ impl Client {
         upo_reference_number: &String,
         access_token: &String,
     ) -> Result<String, error::ErrorResponse> {
+        common::require_not_empty(&session_reference_number, "session_reference_number")?;
+        common::require_not_empty(&upo_reference_number, "upo_reference_number")?;
+        common::require_not_empty(&access_token, "access_token")?;
+
         session::status::get_session_upo(
             &self.base_url,
             &session_reference_number,
@@ -269,6 +303,8 @@ impl Client {
     }
 
     pub async fn get_upo(&self, url: &String) -> Result<String, error::ErrorResponse> {
+        common::require_not_empty(&url, "url")?;
+
         upo::get_upo(&url).await
     }
 
@@ -280,6 +316,8 @@ impl Client {
         page_size: i32,
         session_filter: &Option<session::SessionsFilter>,
     ) -> Result<session::status::SessionsListResponse, error::ErrorResponse> {
+        common::require_not_empty(&access_token, "access_token")?;
+        
         session::status::get_sessions(&self.base_url, session_type, &access_token, page_size, session_filter).await
     }   
 }

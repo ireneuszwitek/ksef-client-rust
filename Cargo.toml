@@ -1,13 +1,13 @@
 [package]
 name = "ksef"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2024"
 authors = ["Ireneusz Witek"]
-license = "MIT OR Apache-2.0"
-description = "Client API KSeF 2.0"
+license = "MIT"
+description = "Communication with the API of the digital platform for managing e-Invoicing in Poland (KSeF 2.0)"
 readme = "README.md"
 keywords = ["ksef", "client"]
-categories = ["api-bindings","web-programming::http-client","web-programming","network-programming"]
+categories = ["api-bindings","web-programming::http-client"]
 repository = "https://github.com/ireneuszwitek/ksef-client-rust"
 
 exclude = ["target/", ".gitignore"]
@@ -36,3 +36,6 @@ qrcode = "0.14"
 image = "0.24"
 cbc = "0.1"
 cipher = { version = "0.4", features = ["alloc"] }
+
+[dev-dependencies]
+http = "1.4"
